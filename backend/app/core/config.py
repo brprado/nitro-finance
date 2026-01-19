@@ -1,15 +1,16 @@
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    # Banco de dados
+    # Banco de Dados
     DATABASE_URL: str
+    DATABASE_SCHEMA: str = "nitro_finance"
 
-    #JWT
+    # JWT
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRATION_MINUTES = int = 1440
+    JWT_EXPIRATION_MINUTES: int = 1440  # 24 horas
 
-   # Z-API (WhatsApp)
+    # Z-API (WhatsApp)
     ZAPI_INSTANCE_ID: str = ""
     ZAPI_TOKEN: str = ""
     ZAPI_PHONE: str = ""
@@ -17,7 +18,8 @@ class Settings(BaseSettings):
     # Cotação
     AWESOME_API_URL: str = "https://economia.awesomeapi.com.br/json/last/USD-BRL"
 
-    class config:
+    class Config:
         env_file = ".env"
+
 
 settings = Settings()
