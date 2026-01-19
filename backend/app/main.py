@@ -2,7 +2,7 @@ from fastapi import FastAPI
 
 app = FastAPI(
     title="Nitro Finance API",
-    description="Sistema de gstão de despesas e assinaturas corporativas",
+    description="Sistema de gestão de despesas e assinaturas corporativas",
     version="1.0.0"
 )
 
