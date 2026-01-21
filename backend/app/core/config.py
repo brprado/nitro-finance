@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     # Banco de Dados
     DATABASE_URL: str
-    DATABASE_SCHEMA: str = "nitro_finance"
+    DATABASE_SCHEMA: str = "public"
 
     # JWT
     JWT_SECRET_KEY: str
@@ -20,6 +20,5 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
-
 
 settings = Settings()

@@ -3,12 +3,15 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.api.v1.endpoints import auth
 
 app = FastAPI(
     title="Nitro Finance API",
     description="Sistema de gestão de despesas e assinaturas corporativas",
     version="1.0.0"
 )
+
+app.include_router(auth.router, prefix="/api/v1")
 
 @app.get("/")
 def root():
