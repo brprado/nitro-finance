@@ -46,9 +46,13 @@ class Expense(Base, BaseModel):
     __tablename__ = "expenses"
 
     # Identificação
+    code = Column(String(20), unique=True, nullable=False, index=True)
     service_name = Column(String(255), nullable=False)
     description = Column(String(500), nullable=True)
-    expense_type = Column(Enum(ExpenseType), nullable=False)
+    expense_type = Column(
+        Enum(ExpenseType, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+    )
     
     # Relacionamentos
     category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=False)
@@ -59,31 +63,49 @@ class Expense(Base, BaseModel):
     
     # Valores
     value = Column(Numeric(12, 2), nullable=False)
-    currency = Column(Enum(Currency), nullable=False)
+    currency = Column(
+        Enum(Currency, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+    )
     value_brl = Column(Numeric(12, 2), nullable=False)
     exchange_rate = Column(Numeric(10, 4), nullable=True)
     exchange_rate_date = Column(DateTime(timezone=True), nullable=True)
     
     # Recorrência
-    periodicity = Column(Enum(Periodicity), nullable=True)
+    periodicity = Column(
+        Enum(Periodicity, values_callable=lambda x: [e.value for e in x]),
+        nullable=True,
+    )
     renewal_date = Column(Date, nullable=True)
     
     # Pagamento
-    payment_method = Column(Enum(PaymentMethod), nullable=False)
+    payment_method = Column(
+        Enum(PaymentMethod, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+    )
     payment_identifier = Column(String(50), nullable=True)
     
     # Detalhes
     contracted_plan = Column(String(100), nullable=True)
     user_count = Column(Integer, nullable=True)
     evidence_link = Column(String(500), nullable=True)
+    login = Column(String(255), nullable=True)
+    password = Column(String(255), nullable=True)
     notes = Column(String(1000), nullable=True)
     
     # Status
-    status = Column(Enum(ExpenseStatus), nullable=False, default=ExpenseStatus.DRAFT)
-    
+    status = Column(
+        Enum(ExpenseStatus, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        default=ExpenseStatus.DRAFT,
+    )
+    cancellation_month = Column(Date, nullable=True)  # Primeiro dia do mês em que foi cancelada
+    charged_when_cancelled = Column(Boolean, nullable=True)  # True = valor do mês conta no dashboard
+
     # Relacionamentos ORM
     category = relationship("Category")
     company = relationship("Company")
     department = relationship("Department")
     owner = relationship("User", foreign_keys=[owner_id])
     approver = relationship("User", foreign_keys=[approver_id])
+    validations = relationship("ExpenseValidation", back_populates="expense")

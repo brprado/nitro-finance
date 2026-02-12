@@ -1,0 +1,41 @@
+from datetime import date, datetime
+from sqlalchemy.orm import Session
+
+from app.core.database import SessionLocal
+from app.services import expense_validation_service
+
+
+def create_monthly_validations_task(month_date: date | None = None) -> dict:
+    """
+    Tarefa para criar validações mensais baseado na periodicidade das despesas.
+    Se month_date não for fornecido, usa o primeiro dia do mês atual.
+    Também marca validações atrasadas do mês anterior.
+    """
+    if month_date is None:
+        today = datetime.now().date()
+        month_date = today.replace(day=1)
+    else:
+        # Garantir que é o primeiro dia do mês
+        month_date = month_date.replace(day=1)
+    
+    db: Session = SessionLocal()
+    try:
+        # Criar validações para o mês especificado
+        validations = expense_validation_service.create_monthly_validations(db, month_date)
+        
+        # Marcar validações atrasadas
+        overdue_count = expense_validation_service.mark_overdue_validations(db)
+        
+        return {
+            "success": True,
+            "month": month_date.isoformat(),
+            "validations_created": len(validations),
+            "overdue_marked": overdue_count
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+    finally:
+        db.close()

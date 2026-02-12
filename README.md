@@ -46,7 +46,7 @@ O Nitro Finance força **governança financeira**, garantindo que toda despesa t
 ### 🔹 Alertas Inteligentes
 - Alertas de renovação próxima  
 - Alertas de pendências de validação  
-- Envio de notificações via **WhatsApp (Z-API)**  
+- Notificações in-app (sem envio externo)  
 
 ### 🔹 Dashboards
 - Visão consolidada de gastos  
@@ -71,6 +71,13 @@ O Nitro Finance força **governança financeira**, garantindo que toda despesa t
 
 ---
 
+## 📁 Estrutura do repositório
+
+- **`backend/`** — API FastAPI (Python)
+- **`frontend/`** — Interface React (Vite + TypeScript)
+
+---
+
 ## 🛠️ Tecnologias Utilizadas
 
 ### Backend
@@ -79,13 +86,10 @@ O Nitro Finance força **governança financeira**, garantindo que toda despesa t
 - JWT (JSON Web Tokens)  
 
 ### Frontend
-- React  
+- React (pasta `frontend/`)  
 
 ### Banco de Dados
 - PostgreSQL  
-
-### Notificações
-- WhatsApp (Z-API)  
 
 ### Infraestrutura
 - Nuvem (infraestrutura existente)  

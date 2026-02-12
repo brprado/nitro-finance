@@ -1,6 +1,12 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="ignore",  # ignora variáveis no .env que não existem no modelo (ex.: ZAPI_* removidas)
+    )
+
     # Banco de Dados
     DATABASE_URL: str
     DATABASE_SCHEMA: str = "public"
@@ -10,15 +16,8 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRATION_MINUTES: int = 1440  # 24 horas
 
-    # Z-API (WhatsApp)
-    ZAPI_INSTANCE_ID: str = ""
-    ZAPI_TOKEN: str = ""
-    ZAPI_PHONE: str = ""
-
     # Cotação
     AWESOME_API_URL: str = "https://economia.awesomeapi.com.br/json/last/USD-BRL"
 
-    class Config:
-        env_file = ".env"
 
 settings = Settings()

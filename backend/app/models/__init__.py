@@ -5,6 +5,8 @@ from app.models.category import Category
 from app.models.department import Department
 from app.models.user import User, UserRole
 from app.models.expense import Expense, ExpenseType, Currency, Periodicity, PaymentMethod, ExpenseStatus
+from app.models.expense_validation import ExpenseValidation, ValidationStatus
+from app.models.alert import Alert, AlertType, AlertStatus, AlertChannel
 
 __all__ = [
     "BaseModel",
@@ -21,4 +23,10 @@ __all__ = [
     "Periodicity",
     "PaymentMethod",
     "ExpenseStatus",
+    "ExpenseValidation",
+    "ValidationStatus",
+    "Alert",
+    "AlertType",
+    "AlertStatus",
+    "AlertChannel",
 ]
