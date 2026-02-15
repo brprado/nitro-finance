@@ -174,7 +174,7 @@ export function ExpenseForm({ expense, onSuccess, onCancel }: ExpenseFormProps) 
           company_id: expense.company_id,
           department_id: expense.department_id,
           owner_id: expense.owner_id,
-          approver_id: expense.approver_id || expense.owner_id,
+          approver_id: expense.owner_id,
           value: formatNumberToBr(Number(expense.value)),
           currency: expense.currency,
           periodicity: expense.expense_type === 'one_time' ? undefined : expense.periodicity,
@@ -195,7 +195,6 @@ export function ExpenseForm({ expense, onSuccess, onCancel }: ExpenseFormProps) 
           company_id: '',
           department_id: '',
           owner_id: '',
-          approver_id: '',
           value: '',
           periodicity: undefined,
           login: '',
@@ -293,7 +292,7 @@ export function ExpenseForm({ expense, onSuccess, onCancel }: ExpenseFormProps) 
         company_id: data.company_id,
         department_id: data.department_id,
         owner_id: data.owner_id,
-        approver_id: data.approver_id || data.owner_id,
+        approver_id: data.owner_id,
         value: valueNum,
         currency: data.currency,
         payment_method: data.payment_method || 'credit_card',
@@ -360,7 +359,7 @@ export function ExpenseForm({ expense, onSuccess, onCancel }: ExpenseFormProps) 
         company_id: data.company_id,
         department_id: data.department_id,
         owner_id: data.owner_id,
-        approver_id: data.approver_id || data.owner_id,
+        approver_id: data.owner_id,
         value: valueNum,
         currency: data.currency,
         description: data.description?.trim() || undefined,
@@ -513,51 +512,29 @@ export function ExpenseForm({ expense, onSuccess, onCancel }: ExpenseFormProps) 
         </div>
       </div>
 
-      {/* Responsible */}
+      {/* Responsável (também é o validador) */}
       <div className="space-y-4">
-        <h3 className="font-medium text-lg border-b pb-2">Responsáveis</h3>
-        
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="owner_id">Responsável *</Label>
-            <Select
-              value={watch('owner_id') ?? ''}
-              onValueChange={(v) => setValue('owner_id', v)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione" />
-              </SelectTrigger>
-              <SelectContent>
-                {users?.filter(u => u.is_active).map((user) => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {user.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.owner_id && (
-              <p className="text-sm text-destructive mt-1">{errors.owner_id.message}</p>
-            )}
-          </div>
-
-          <div>
-            <Label htmlFor="approver_id">Aprovador</Label>
-            <Select
-              value={watch('approver_id') ?? ''}
-              onValueChange={(v) => setValue('approver_id', v || undefined)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione (opcional)" />
-              </SelectTrigger>
-              <SelectContent>
-                {users?.filter(u => u.is_active && (u.role === 'leader' || u.role === 'finance_admin' || u.role === 'system_admin')).map((user) => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {user.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <h3 className="font-medium text-lg border-b pb-2">Responsável</h3>
+        <div>
+          <Label htmlFor="owner_id">Responsável *</Label>
+          <Select
+            value={watch('owner_id') ?? ''}
+            onValueChange={(v) => setValue('owner_id', v)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione" />
+            </SelectTrigger>
+            <SelectContent>
+              {users?.filter(u => u.is_active).map((user) => (
+                <SelectItem key={user.id} value={user.id}>
+                  {user.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.owner_id && (
+            <p className="text-sm text-destructive mt-1">{errors.owner_id.message}</p>
+          )}
         </div>
       </div>
 

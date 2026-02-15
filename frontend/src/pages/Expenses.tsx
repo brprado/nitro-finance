@@ -548,15 +548,6 @@ export default function ExpensesPage() {
                             )}
                           </div>
                         </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground mb-1">Aprovador</p>
-                          <div>
-                            <p className="font-medium">{expense.approver?.name || expense.approver?.email || 'N/A'}</p>
-                            {expense.approver?.name && expense.approver?.email && (
-                              <p className="text-xs text-muted-foreground">{expense.approver.email}</p>
-                            )}
-                          </div>
-                        </div>
                       </div>
                     </div>
 

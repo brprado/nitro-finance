@@ -169,15 +169,10 @@ def create_expense(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Owner não encontrado"
         )
-    
-    # Valida approver
-    approver = user_service.get_by_id(db, data.approver_id)
-    if not approver:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Aprovador não encontrado"
-        )
-    
+    # Responsável = validador: se approver_id não vier, usa owner_id
+    approver_id = data.approver_id if data.approver_id is not None else data.owner_id
+    data = data.model_copy(update={"approver_id": approver_id})
+
     # Converte para BRL
     try:
         currency_str = data.currency.value if hasattr(data.currency, "value") else str(data.currency)
@@ -255,6 +250,9 @@ def update_expense(
                 detail=str(e)
             )
     
+    # Responsável = validador: ao alterar owner_id, forçar approver_id = owner_id
+    if data.owner_id is not None:
+        data = data.model_copy(update={"approver_id": data.owner_id})
     try:
         return expense_service.update(
             db=db,

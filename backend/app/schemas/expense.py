@@ -15,7 +15,7 @@ class ExpenseCreate(BaseModel):
     company_id: UUID
     department_id: UUID
     owner_id: UUID
-    approver_id: UUID
+    approver_id: UUID | None = None  # Se omitido, o endpoint usa owner_id (responsável = validador)
     value: Decimal
     currency: Currency
     periodicity: Periodicity | None = None

@@ -104,7 +104,7 @@ export interface ExpenseFormData {
   company_id: string;
   department_id: string;
   owner_id: string;
-  approver_id: string;
+  approver_id?: string;
   value: number;
   currency: Currency;
   periodicity?: Periodicity;
