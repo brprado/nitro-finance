@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, XCircle, Loader2, Calendar, PartyPopper, Clock, User, Filter } from 'lucide-react';
-import { validationsApi, companiesApi, departmentsApi } from '@/services/api';
+import { CheckCircle2, XCircle, Loader2, Calendar, PartyPopper, Clock, User, Filter, Download } from 'lucide-react';
+import { validationsApi, companiesApi, departmentsApi, usersApi } from '@/services/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -42,8 +42,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, formatMonth } from '@/lib/formatters';
-import type { ValidationStatus } from '@/types';
+import { formatCurrency, formatMonth, formatDate } from '@/lib/formatters';
+import type { ValidationStatus, ExpenseValidation } from '@/types';
 
 function getMonthOptions() {
   const options = [];
@@ -66,6 +66,57 @@ function getMonthOptions() {
   return options;
 }
 
+function escapeCsvCell(value: string): string {
+  const s = String(value ?? '');
+  if (s.includes(';') || s.includes('"')) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+function buildValidationsCsv(
+  validations: ExpenseValidation[],
+  formatCurrencyFn: (v: number, currency?: string) => string,
+  formatMonthFn: (s: string) => string
+): string {
+  const header = 'Código;Serviço;Empresa;Setor;Responsável;Valor;Status;Mês;Validado por;Data';
+  const statusLabels: Record<string, string> = {
+    pending: 'Pendente',
+    approved: 'Aprovada',
+    rejected: 'Rejeitada',
+  };
+  const rows = validations.map((v) => {
+    const expense = v.expense;
+    const code = expense?.code ?? '';
+    const service = expense?.service_name ?? '';
+    const company = expense?.company?.name ?? '';
+    const department = expense?.department?.name ?? '';
+    const owner = expense?.owner?.name ?? '';
+    const value =
+      expense != null
+        ? formatCurrencyFn(Number(expense.value ?? 0), expense.currency ?? 'BRL')
+        : '';
+    const status = statusLabels[v.status] ?? v.status;
+    const month = v.validation_month ? formatMonthFn(v.validation_month) : '';
+    const validator = v.validator?.name ?? '';
+    const date = v.validated_at ? formatDate(v.validated_at) : '';
+    return [code, service, company, department, owner, value, status, month, validator, date]
+      .map(escapeCsvCell)
+      .join(';');
+  });
+  return [header, ...rows].join('\r\n');
+}
+
+function downloadCsv(csvContent: string, filename: string): void {
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function ValidationsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -79,6 +130,7 @@ export default function ValidationsPage() {
   const [filters, setFilters] = useState<{
     company_id?: string;
     department_id?: string;
+    owner_id?: string;
   }>({});
 
   const monthOptions = getMonthOptions();
@@ -93,6 +145,11 @@ export default function ValidationsPage() {
     queryKey: ['departments', filters.company_id],
     queryFn: () => departmentsApi.getAll(filters.company_id),
     enabled: !!filters.company_id,
+  });
+
+  const { data: users } = useQuery({
+    queryKey: ['users'],
+    queryFn: usersApi.getAll,
   });
 
   // Detectar se é mês futuro
@@ -151,9 +208,12 @@ export default function ValidationsPage() {
       if (filters.department_id && validation.expense?.department_id !== filters.department_id) {
         return false;
       }
+      if (filters.owner_id && validation.expense?.owner_id !== filters.owner_id) {
+        return false;
+      }
       return true;
     });
-  }, [validations, filters.company_id, filters.department_id]);
+  }, [validations, filters.company_id, filters.department_id, filters.owner_id]);
 
   // Calcular totais
   const totals = useMemo(() => {
@@ -262,8 +322,24 @@ export default function ValidationsPage() {
     setFilters({ ...filters, department_id: departmentId });
   };
 
+  const handleOwnerChange = (value: string) => {
+    const ownerId = value === 'all' ? undefined : value;
+    setFilters({ ...filters, owner_id: ownerId });
+  };
+
   const clearFilters = () => {
     setFilters({});
+  };
+
+  const handleExportCsv = () => {
+    if (!filteredValidations?.length) return;
+    const csv = buildValidationsCsv(filteredValidations, formatCurrency, formatMonth);
+    const filename = `validacoes-${selectedMonth}-${activeTab}.csv`;
+    downloadCsv(csv, filename);
+    toast({
+      title: 'Exportação concluída',
+      description: `${filteredValidations.length} validação(ões) exportada(s).`,
+    });
   };
 
   const getStatusBadge = (status: ValidationStatus, isOverdue: boolean, isPredicted?: boolean) => {
@@ -332,6 +408,14 @@ export default function ValidationsPage() {
             ))}
           </SelectContent>
         </Select>
+        <Button
+          variant="outline"
+          onClick={handleExportCsv}
+          disabled={isLoading || !filteredValidations?.length}
+        >
+          <Download className="h-4 w-4 mr-2" />
+          Exportar CSV
+        </Button>
       </div>
 
       {/* Filters */}
@@ -373,7 +457,23 @@ export default function ValidationsPage() {
                 ))}
               </SelectContent>
             </Select>
-            {(filters.company_id || filters.department_id) && (
+            <Select
+              value={filters.owner_id ?? 'all'}
+              onValueChange={handleOwnerChange}
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Responsável" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os responsáveis</SelectItem>
+                {users?.filter((u) => u.is_active).map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.name || user.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {(filters.company_id || filters.department_id || filters.owner_id) && (
               <Button variant="ghost" onClick={clearFilters} className="text-muted-foreground">
                 Limpar filtros
               </Button>
