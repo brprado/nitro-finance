@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Loader2, Users } from 'lucide-react';
-import { usersApi, departmentsApi } from '@/services/api';
+import { Plus, Pencil, Trash2, Loader2, Users, X } from 'lucide-react';
+import { usersApi, companiesApi, departmentsApi } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
 import {
   Table,
   TableBody,
@@ -43,13 +44,13 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { getRoleLabel, getRoleBadgeVariant } from '@/lib/formatters';
-import type { User, UserRole } from '@/types';
+import type { User, UserRole, Department } from '@/types';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const roleOptions: { value: UserRole; label: string }[] = [
   { value: 'finance_admin', label: 'Finance Admin' },
   { value: 'system_admin', label: 'System Admin' },
   { value: 'leader', label: 'Líder' },
-  { value: 'user', label: 'Usuário' },
 ];
 
 export default function UsersPage() {
@@ -63,23 +64,79 @@ export default function UsersPage() {
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formPassword, setFormPassword] = useState('');
-  const [formRole, setFormRole] = useState<UserRole>('user');
+  const [formRole, setFormRole] = useState<UserRole>('leader');
   const [formPhone, setFormPhone] = useState('');
+  const [formCompanyIds, setFormCompanyIds] = useState<string[]>([]);
+  const [formDepartmentIds, setFormDepartmentIds] = useState<string[]>([]);
+  const [departmentsByCompany, setDepartmentsByCompany] = useState<Record<string, Department[]>>({});
 
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: usersApi.getAll,
   });
 
-  const { data: departments } = useQuery({
-    queryKey: ['departments'],
-    queryFn: () => departmentsApi.getAll(),
+  const { data: companies } = useQuery({
+    queryKey: ['companies'],
+    queryFn: companiesApi.getAll,
   });
+
+  // Buscar departments quando empresas são selecionadas (apenas para finance_admin)
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      const newDepartmentsByCompany: Record<string, Department[]> = {};
+      const companiesToFetch = formCompanyIds.filter(id => !departmentsByCompany[id]);
+      
+      // Buscar departments apenas para empresas novas
+      for (const companyId of companiesToFetch) {
+        try {
+          const depts = await departmentsApi.getAll(companyId);
+          newDepartmentsByCompany[companyId] = depts.filter(d => d.is_active);
+        } catch (error) {
+          console.error(`Erro ao buscar setores da empresa ${companyId}:`, error);
+          newDepartmentsByCompany[companyId] = [];
+        }
+      }
+      
+      // Manter departments já carregados e adicionar novos
+      const updatedDepartmentsByCompany = { ...departmentsByCompany, ...newDepartmentsByCompany };
+      
+      // Remover departments de empresas que não estão mais selecionadas
+      const finalDepartmentsByCompany: Record<string, Department[]> = {};
+      for (const companyId of formCompanyIds) {
+        if (updatedDepartmentsByCompany[companyId]) {
+          finalDepartmentsByCompany[companyId] = updatedDepartmentsByCompany[companyId];
+        }
+      }
+      
+      setDepartmentsByCompany(finalDepartmentsByCompany);
+      
+      // Remover departments de empresas que foram desmarcadas
+      const validDepartmentIds = formDepartmentIds.filter(deptId => {
+        return Object.values(finalDepartmentsByCompany).some(depts => 
+          depts.some(d => d.id === deptId)
+        );
+      });
+      if (validDepartmentIds.length !== formDepartmentIds.length) {
+        setFormDepartmentIds(validDepartmentIds);
+      }
+    };
+
+    // Apenas finance_admin precisa selecionar departamentos
+    if (formCompanyIds.length > 0 && formRole === 'finance_admin') {
+      fetchDepartments();
+    } else {
+      setDepartmentsByCompany({});
+      setFormDepartmentIds([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formCompanyIds, formRole]);
 
   const createMutation = useMutation({
     mutationFn: usersApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['users'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['expenses'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['validations'], exact: false });
       closeForm();
       toast({ title: 'Usuário criado com sucesso!' });
     },
@@ -89,7 +146,9 @@ export default function UsersPage() {
     mutationFn: ({ id, data }: { id: string; data: Partial<User> }) =>
       usersApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['users'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['expenses'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['validations'], exact: false });
       closeForm();
       toast({ title: 'Usuário atualizado com sucesso!' });
     },
@@ -98,7 +157,9 @@ export default function UsersPage() {
   const deleteMutation = useMutation({
     mutationFn: usersApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['users'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['expenses'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['validations'], exact: false });
       setDeletingUser(null);
       toast({ title: 'Usuário removido com sucesso!' });
     },
@@ -110,8 +171,11 @@ export default function UsersPage() {
     setFormName('');
     setFormEmail('');
     setFormPassword('');
-    setFormRole('user');
+    setFormRole('leader');
     setFormPhone('');
+    setFormCompanyIds([]);
+    setFormDepartmentIds([]);
+    setDepartmentsByCompany({});
   };
 
   const handleCreate = () => {
@@ -119,18 +183,45 @@ export default function UsersPage() {
     setFormName('');
     setFormEmail('');
     setFormPassword('');
-    setFormRole('user');
+    setFormRole('leader');
     setFormPhone('');
+    setFormCompanyIds([]);
+    setFormDepartmentIds([]);
+    setDepartmentsByCompany({});
     setIsFormOpen(true);
   };
 
-  const handleEdit = (user: User) => {
+  const handleEdit = async (user: User) => {
     setEditingUser(user);
     setFormName(user.name);
     setFormEmail(user.email);
     setFormPassword('');
     setFormRole(user.role);
     setFormPhone(user.phone || '');
+    const companyIds = user.companies?.map((c) => c.id) ?? [];
+    setFormCompanyIds(companyIds);
+    // Apenas finance_admin precisa de departments
+    if (user.role === 'finance_admin') {
+      setFormDepartmentIds(user.departments?.map((d) => d.id) ?? []);
+      // Buscar departments das empresas do usuário
+      if (companyIds.length > 0) {
+        const deptsByCompany: Record<string, Department[]> = {};
+        for (const companyId of companyIds) {
+          try {
+            const depts = await departmentsApi.getAll(companyId);
+            deptsByCompany[companyId] = depts.filter(d => d.is_active);
+          } catch (error) {
+            console.error(`Erro ao buscar setores da empresa ${companyId}:`, error);
+            deptsByCompany[companyId] = [];
+          }
+        }
+        setDepartmentsByCompany(deptsByCompany);
+      }
+    } else {
+      setFormDepartmentIds([]);
+      setDepartmentsByCompany({});
+    }
+    
     setIsFormOpen(true);
   };
 
@@ -146,6 +237,8 @@ export default function UsersPage() {
           email: formEmail,
           role: formRole,
           phone: formPhone || undefined,
+          company_ids: (formRole === 'leader' || formRole === 'finance_admin') ? formCompanyIds : undefined,
+          department_ids: formRole === 'finance_admin' ? formDepartmentIds : undefined,
         },
       });
     } else {
@@ -155,6 +248,8 @@ export default function UsersPage() {
         password: formPassword,
         role: formRole,
         phone: formPhone || undefined,
+        company_ids: (formRole === 'leader' || formRole === 'finance_admin') ? formCompanyIds : [],
+        department_ids: formRole === 'finance_admin' ? formDepartmentIds : [],
       });
     }
   };
@@ -215,7 +310,7 @@ export default function UsersPage() {
                   <TableHead className="font-semibold">Nome</TableHead>
                   <TableHead className="font-semibold">Email</TableHead>
                   <TableHead className="font-semibold">Perfil</TableHead>
-                  <TableHead className="font-semibold">Setores</TableHead>
+                  <TableHead className="font-semibold">Empresas</TableHead>
                   <TableHead className="font-semibold">Status</TableHead>
                   <TableHead className="font-semibold w-[120px]">Ações</TableHead>
                 </TableRow>
@@ -232,10 +327,10 @@ export default function UsersPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {user.departments?.length > 0 ? (
-                          user.departments.map((dept) => (
-                            <Badge key={dept.id} variant="outline" className="text-xs">
-                              {dept.name}
+                        {user.companies?.length ? (
+                          user.companies.map((c) => (
+                            <Badge key={c.id} variant="outline" className="text-xs">
+                              {c.name}
                             </Badge>
                           ))
                         ) : (
@@ -283,13 +378,13 @@ export default function UsersPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={isFormOpen} onOpenChange={(open) => !open && closeForm()}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>
               {editingUser ? 'Editar Usuário' : 'Novo Usuário'}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="flex-1 overflow-y-auto max-h-[min(70vh,400px)] space-y-4 py-4 pr-1">
             <div className="space-y-2">
               <Label htmlFor="name">Nome *</Label>
               <Input
@@ -299,7 +394,7 @@ export default function UsersPage() {
                 placeholder="Nome completo"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="email">Email *</Label>
               <Input
@@ -310,7 +405,7 @@ export default function UsersPage() {
                 placeholder="email@empresa.com"
               />
             </div>
-            
+
             {!editingUser && (
               <div className="space-y-2">
                 <Label htmlFor="password">Senha *</Label>
@@ -323,12 +418,24 @@ export default function UsersPage() {
                 />
               </div>
             )}
-            
+
             <div className="space-y-2">
               <Label htmlFor="role">Perfil *</Label>
               <Select
-                value={formRole ?? 'user'}
-                onValueChange={(v) => setFormRole(v as UserRole)}
+                value={formRole ?? 'leader'}
+                onValueChange={(v) => {
+                  const newRole = v as UserRole;
+                  setFormRole(newRole);
+                  if (newRole !== 'leader' && newRole !== 'finance_admin') {
+                    setFormCompanyIds([]);
+                    setFormDepartmentIds([]);
+                    setDepartmentsByCompany({});
+                  } else if (newRole === 'leader') {
+                    // Limpar departments quando mudar para leader
+                    setFormDepartmentIds([]);
+                    setDepartmentsByCompany({});
+                  }
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Perfil" />
@@ -342,7 +449,108 @@ export default function UsersPage() {
                 </SelectContent>
               </Select>
             </div>
-            
+
+            <div className="space-y-2">
+              <Label>Empresas (escopo de atuação)</Label>
+              {(formRole === 'leader' || formRole === 'finance_admin') ? (
+                <div className="space-y-3">
+                  <MultiSelect
+                    placeholder="Selecione as empresas"
+                    options={companies?.filter(c => c.is_active).map((c) => ({ value: c.id, label: c.name })) ?? []}
+                    value={formCompanyIds}
+                    onChange={setFormCompanyIds}
+                  />
+                  
+                  {/* Lista de setores por empresa selecionada (apenas para finance_admin) */}
+                  {formRole === 'finance_admin' && formCompanyIds.length > 0 && (
+                    <div className="space-y-3 mt-4 pt-4 border-t">
+                      <Label className="text-sm font-medium">Setores por empresa:</Label>
+                      {formCompanyIds.map((companyId) => {
+                        const company = companies?.find(c => c.id === companyId);
+                        const companyDepartments = departmentsByCompany[companyId] || [];
+                        const selectedDeptIds = formDepartmentIds.filter(id => 
+                          companyDepartments.some(d => d.id === id)
+                        );
+                        
+                        return (
+                          <div key={companyId} className="space-y-2 p-3 border rounded-lg bg-muted/30">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-sm font-semibold">{company?.name || 'Empresa'}</Label>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => {
+                                  const newCompanyIds = formCompanyIds.filter(id => id !== companyId);
+                                  setFormCompanyIds(newCompanyIds);
+                                  // Remover departments dessa empresa
+                                  const deptsToKeep = formDepartmentIds.filter(id =>
+                                    !companyDepartments.some(d => d.id === id)
+                                  );
+                                  setFormDepartmentIds(deptsToKeep);
+                                }}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            {companyDepartments.length > 0 ? (
+                              <div className="space-y-2 pl-2">
+                                {companyDepartments.map((dept) => (
+                                  <div key={dept.id} className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`dept-${dept.id}`}
+                                      checked={formDepartmentIds.includes(dept.id)}
+                                      onCheckedChange={(checked) => {
+                                        if (checked) {
+                                          setFormDepartmentIds([...formDepartmentIds, dept.id]);
+                                        } else {
+                                          setFormDepartmentIds(formDepartmentIds.filter(id => id !== dept.id));
+                                        }
+                                      }}
+                                    />
+                                    <Label
+                                      htmlFor={`dept-${dept.id}`}
+                                      className="text-sm font-normal cursor-pointer"
+                                    >
+                                      {dept.name}
+                                    </Label>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-muted-foreground pl-2">
+                                Carregando setores...
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {formRole === 'leader' && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      O líder terá acesso a todos os setores das empresas selecionadas.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Empresas se aplicam apenas aos perfis Líder e Finance Admin.
+                  </p>
+                  <div className="pointer-events-none opacity-60">
+                    <MultiSelect
+                      placeholder="Selecione as empresas"
+                      options={companies?.filter(c => c.is_active).map((c) => ({ value: c.id, label: c.name })) ?? []}
+                      value={[]}
+                      onChange={() => {}}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="phone">Telefone</Label>
               <Input

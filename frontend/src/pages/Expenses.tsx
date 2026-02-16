@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Filter, MoreHorizontal, Eye, Pencil, XCircle, Loader2 } from 'lucide-react';
-import { expensesApi, companiesApi, departmentsApi, usersApi, categoriesApi } from '@/services/api';
+import { expensesApi, companiesApi, usersApi, categoriesApi } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,18 +48,13 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, getStatusLabel, getStatusBadgeVariant, getPeriodicityLabel, formatDate, formatDateTime } from '@/lib/formatters';
+import { formatCurrency, getStatusLabel, getStatusBadgeVariant, getPeriodicityLabel, formatDate, formatDateTime, formatMonth } from '@/lib/formatters';
 import { ExpenseForm } from '@/components/expenses/ExpenseForm';
 import type { Expense, ExpenseFilters, ExpenseStatus, ExpenseType } from '@/types';
 
 const statusOptions: { value: ExpenseStatus; label: string }[] = [
-  { value: 'draft', label: 'Rascunho' },
-  { value: 'in_review', label: 'Em Revisão' },
   { value: 'active', label: 'Ativo' },
-  { value: 'cancellation_requested', label: 'Cancelamento Solicitado' },
   { value: 'cancelled', label: 'Cancelado' },
-  { value: 'suspended', label: 'Suspenso' },
-  { value: 'migrated', label: 'Migrado' },
 ];
 
 const expenseTypeOptions: { value: ExpenseType; label: string }[] = [
@@ -69,7 +64,7 @@ const expenseTypeOptions: { value: ExpenseType; label: string }[] = [
 
 
 export default function ExpensesPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -88,11 +83,6 @@ export default function ExpensesPage() {
   const { data: companies } = useQuery({
     queryKey: ['companies'],
     queryFn: companiesApi.getAll,
-  });
-
-  const { data: departments } = useQuery({
-    queryKey: ['departments', filters.company_ids?.[0]],
-    queryFn: () => departmentsApi.getAll(filters.company_ids?.[0]),
   });
 
   const { data: users } = useQuery({
@@ -117,7 +107,12 @@ export default function ExpensesPage() {
     onSuccess: () => {
       setCancelExpense(null);
       queryClient.invalidateQueries({ queryKey: ['expenses'], exact: false });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['validations'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['validations-history'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['validations-pending'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['validations-predicted'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'], exact: false });
       toast({
         title: 'Despesa cancelada',
         description: 'A despesa foi cancelada com sucesso.',
@@ -138,7 +133,6 @@ export default function ExpensesPage() {
 
   const hasActiveFilters =
     (filters.company_ids?.length ?? 0) > 0 ||
-    (filters.department_ids?.length ?? 0) > 0 ||
     (filters.owner_ids?.length ?? 0) > 0 ||
     (filters.category_ids?.length ?? 0) > 0 ||
     (filters.status?.length ?? 0) > 0 ||
@@ -157,10 +151,14 @@ export default function ExpensesPage() {
   const handleFormSuccess = () => {
     setIsFormOpen(false);
     setEditingExpense(null);
-    // Invalida todas as queries de expenses (incluindo as com filtros)
+    // Invalida todas as queries relacionadas para atualizar automaticamente
     queryClient.invalidateQueries({ queryKey: ['expenses'], exact: false });
-    // Força refetch imediato para garantir atualização
-    queryClient.refetchQueries({ queryKey: ['expenses'] });
+    queryClient.invalidateQueries({ queryKey: ['validations'], exact: false });
+    queryClient.invalidateQueries({ queryKey: ['validations-history'], exact: false });
+    queryClient.invalidateQueries({ queryKey: ['validations-pending'], exact: false });
+    queryClient.invalidateQueries({ queryKey: ['validations-predicted'], exact: false });
+    queryClient.invalidateQueries({ queryKey: ['dashboard-stats'], exact: false });
+    queryClient.invalidateQueries({ queryKey: ['dashboard'], exact: false });
     toast({
       title: editingExpense ? 'Despesa atualizada!' : 'Despesa criada!',
       description: 'A operação foi realizada com sucesso.',
@@ -177,12 +175,10 @@ export default function ExpensesPage() {
             Gerencie as despesas e assinaturas da empresa
           </p>
         </div>
-        {isAdmin && (
-          <Button onClick={handleCreate} className="nitro-btn-primary">
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Despesa
-          </Button>
-        )}
+        <Button onClick={handleCreate} className="nitro-btn-primary">
+          <Plus className="h-4 w-4 mr-2" />
+          Nova Despesa
+        </Button>
       </div>
 
       {/* Filters */}
@@ -192,21 +188,24 @@ export default function ExpensesPage() {
             <MultiSelect
               label="Empresa"
               placeholder="Todas as empresas"
-              options={companies?.map((c) => ({ value: c.id, label: c.name })) ?? []}
+              options={
+                (user?.role === 'leader' && user.companies
+                  ? companies?.filter((c) => user.companies?.some((uc) => uc.id === c.id))
+                  : companies
+                )?.map((c) => ({ value: c.id, label: c.name })) ?? []
+              }
               value={filters.company_ids ?? []}
               onChange={(company_ids) => setFilters({ ...filters, company_ids })}
             />
             <MultiSelect
-              label="Setor"
-              placeholder="Todos os setores"
-              options={departments?.map((d) => ({ value: d.id, label: d.name })) ?? []}
-              value={filters.department_ids ?? []}
-              onChange={(department_ids) => setFilters({ ...filters, department_ids })}
-            />
-            <MultiSelect
               label="Responsável"
               placeholder="Todos os responsáveis"
-              options={users?.map((u) => ({ value: u.id, label: u.name || u.email })) ?? []}
+              options={
+                (user?.role === 'leader' && user
+                  ? [user]
+                  : users
+                )?.map((u) => ({ value: u.id, label: u.name || u.email })) ?? []
+              }
               value={filters.owner_ids ?? []}
               onChange={(owner_ids) => setFilters({ ...filters, owner_ids })}
             />
@@ -418,17 +417,19 @@ export default function ExpensesPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
             <DialogTitle>
               {editingExpense ? 'Editar Despesa' : 'Nova Despesa'}
             </DialogTitle>
           </DialogHeader>
-          <ExpenseForm
-            expense={editingExpense}
-            onSuccess={handleFormSuccess}
-            onCancel={() => setIsFormOpen(false)}
-          />
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6 pr-5">
+            <ExpenseForm
+              expense={editingExpense}
+              onSuccess={handleFormSuccess}
+              onCancel={() => setIsFormOpen(false)}
+            />
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -682,6 +683,40 @@ export default function ExpensesPage() {
                         </div>
                       </div>
                     )}
+
+                    {/* Histórico */}
+                    <div>
+                      <h3 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wide">Histórico</h3>
+                      <div className="space-y-3">
+                        <p className="text-sm">
+                          Criada em {formatDateTime(expense.created_at)}
+                          {expense.created_by ? ` por ${expense.created_by.name}` : ''}.
+                        </p>
+                        {expense.validations && expense.validations.length > 0 && (
+                          <ul className="list-disc list-inside space-y-1 text-sm">
+                            {[...expense.validations]
+                              .sort((a, b) => (a.validation_month || '').localeCompare(b.validation_month || ''))
+                              .map((v, i) => {
+                                const monthLabel = v.validation_month ? formatMonth(v.validation_month) : '';
+                                const statusLabel = v.status === 'approved' ? 'Aprovada' : v.status === 'rejected' ? 'Rejeitada' : 'Pendente';
+                                const byWho = v.validator?.name || 'N/A';
+                                const when = v.validated_at ? formatDateTime(v.validated_at) : '';
+                                return (
+                                  <li key={i}>
+                                    Mês {monthLabel}: {statusLabel} por {byWho}{when ? ` em ${when}` : ''}.
+                                  </li>
+                                );
+                              })}
+                          </ul>
+                        )}
+                        {expense.status === 'cancelled' && expense.cancelled_at && (
+                          <p className="text-sm">
+                            Cancelada em {formatDateTime(expense.cancelled_at)}
+                            {expense.cancelled_by ? ` por ${expense.cancelled_by.name}` : ''}.
+                          </p>
+                        )}
+                      </div>
+                    </div>
 
                     {/* Metadados */}
                     <div>

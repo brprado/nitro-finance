@@ -1,7 +1,7 @@
 // Tipos alinhados à API do backend (IDs são UUID string)
 
 // User & Auth Types
-export type UserRole = 'finance_admin' | 'system_admin' | 'leader' | 'user';
+export type UserRole = 'finance_admin' | 'system_admin' | 'leader';
 
 export interface User {
   id: string;
@@ -11,6 +11,7 @@ export interface User {
   phone?: string;
   is_active: boolean;
   departments: Department[];
+  companies?: { id: string; name: string }[];
 }
 
 export interface AuthResponse {
@@ -53,7 +54,7 @@ export interface Category {
 
 // Expense Types (backend)
 export type ExpenseType = 'recurring' | 'one_time';
-export type ExpenseStatus = 'draft' | 'in_review' | 'active' | 'cancellation_requested' | 'cancelled' | 'suspended' | 'migrated';
+export type ExpenseStatus = 'active' | 'cancelled';
 export type Periodicity = 'monthly' | 'quarterly' | 'semiannual' | 'annual';
 export type Currency = 'BRL' | 'USD';
 export type PaymentMethod = 'credit_card' | 'debit_card' | 'boleto' | 'pix' | 'transfer';
@@ -94,6 +95,17 @@ export interface Expense {
   charged_when_cancelled?: boolean;
   created_at: string;
   updated_at: string;
+  created_by?: { id: string; name: string; email: string };
+  cancelled_at?: string;
+  cancelled_by?: { id: string; name: string; email: string };
+  validations?: ExpenseValidationLogItem[];
+}
+
+export interface ExpenseValidationLogItem {
+  validation_month: string;
+  status: string;
+  validated_at?: string;
+  validator?: { id: string; name: string; email: string };
 }
 
 export interface ExpenseFormData {

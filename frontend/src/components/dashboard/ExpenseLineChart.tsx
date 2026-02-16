@@ -10,10 +10,12 @@ interface ExpenseLineChartProps {
   exchangeRate?: number;
 }
 
+const CHART_PRIMARY = '#1DBA9B';
+
 const chartConfig = {
   total_value: {
     label: 'Valor Total',
-    color: 'hsl(var(--chart-1))',
+    color: CHART_PRIMARY,
   },
 };
 
@@ -64,7 +66,7 @@ export function ExpenseLineChart({ data, title, currency = 'BRL', exchangeRate =
           <Line
             type="monotone"
             dataKey="total_value"
-            stroke="hsl(var(--chart-1))"
+            stroke={CHART_PRIMARY}
             strokeWidth={2}
             dot={{ r: 4 }}
             activeDot={{ r: 6 }}

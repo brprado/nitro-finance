@@ -41,12 +41,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [loadUser]);
 
   const login = async (credentials: LoginCredentials) => {
-    const response = await authApi.login(credentials);
-    localStorage.setItem('nitro_token', response.access_token);
-    
-    const userData = await authApi.getCurrentUser();
-    setUser(userData);
-    localStorage.setItem('nitro_user', JSON.stringify(userData));
+    try {
+      const response = await authApi.login(credentials);
+      localStorage.setItem('nitro_token', response.access_token);
+      
+      const userData = await authApi.getCurrentUser();
+      setUser(userData);
+      localStorage.setItem('nitro_user', JSON.stringify(userData));
+    } catch (error) {
+      // Limpar token se houver erro ao buscar dados do usuário após login
+      localStorage.removeItem('nitro_token');
+      localStorage.removeItem('nitro_user');
+      // Propagar erro para o componente
+      throw error;
+    }
   };
 
   const logout = () => {

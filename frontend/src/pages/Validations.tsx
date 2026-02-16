@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, XCircle, Loader2, Calendar, PartyPopper, Clock, User, Filter, Download } from 'lucide-react';
-import { validationsApi, companiesApi, departmentsApi, usersApi } from '@/services/api';
+import { validationsApi, companiesApi, usersApi } from '@/services/api';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -118,6 +119,7 @@ function downloadCsv(csvContent: string, filename: string): void {
 }
 
 export default function ValidationsPage() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
@@ -129,7 +131,6 @@ export default function ValidationsPage() {
   const [rejectChargedChoice, setRejectChargedChoice] = useState<boolean | null>(null);
   const [filters, setFilters] = useState<{
     company_id?: string;
-    department_id?: string;
     owner_id?: string;
   }>({});
 
@@ -139,12 +140,6 @@ export default function ValidationsPage() {
   const { data: companies } = useQuery({
     queryKey: ['companies'],
     queryFn: companiesApi.getAll,
-  });
-
-  const { data: departments } = useQuery({
-    queryKey: ['departments', filters.company_id],
-    queryFn: () => departmentsApi.getAll(filters.company_id),
-    enabled: !!filters.company_id,
   });
 
   const { data: users } = useQuery({
@@ -199,21 +194,18 @@ export default function ValidationsPage() {
     ? pendingValidations || []
     : historyValidations || [];
 
-  // Aplicar filtros de empresa e setor
+  // Aplicar filtros de empresa e responsável
   const filteredValidations = useMemo(() => {
     return validations.filter((validation) => {
-      if (filters.company_id && validation.expense?.company_id !== filters.company_id) {
+      if (filters.company_id && validation.expense?.company?.id !== filters.company_id) {
         return false;
       }
-      if (filters.department_id && validation.expense?.department_id !== filters.department_id) {
-        return false;
-      }
-      if (filters.owner_id && validation.expense?.owner_id !== filters.owner_id) {
+      if (filters.owner_id && validation.expense?.owner?.id !== filters.owner_id) {
         return false;
       }
       return true;
     });
-  }, [validations, filters.company_id, filters.department_id, filters.owner_id]);
+  }, [validations, filters.company_id, filters.owner_id]);
 
   // Calcular totais
   const totals = useMemo(() => {
@@ -250,10 +242,13 @@ export default function ValidationsPage() {
   const approveMutation = useMutation({
     mutationFn: validationsApi.approve,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['validations'] });
-      queryClient.invalidateQueries({ queryKey: ['validations-history'] });
-      queryClient.invalidateQueries({ queryKey: ['validations-pending'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['validations'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['validations-history'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['validations-pending'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['validations-predicted'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['expenses'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'], exact: false });
       toast({
         title: 'Despesa aprovada!',
         description: 'A validação foi registrada com sucesso.',
@@ -272,10 +267,13 @@ export default function ValidationsPage() {
     mutationFn: ({ id, charged_this_month }: { id: string; charged_this_month: boolean }) =>
       validationsApi.reject(id, { charged_this_month }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['validations'] });
-      queryClient.invalidateQueries({ queryKey: ['validations-history'] });
-      queryClient.invalidateQueries({ queryKey: ['validations-pending'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['validations'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['validations-history'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['validations-pending'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['validations-predicted'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['expenses'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'], exact: false });
       setRejectingId(null);
       setRejectChargedChoice(null);
       toast({
@@ -314,12 +312,7 @@ export default function ValidationsPage() {
 
   const handleCompanyChange = (value: string) => {
     const companyId = value === 'all' ? undefined : value;
-    setFilters({ company_id: companyId, department_id: undefined });
-  };
-
-  const handleDepartmentChange = (value: string) => {
-    const departmentId = value === 'all' ? undefined : value;
-    setFilters({ ...filters, department_id: departmentId });
+    setFilters({ ...filters, company_id: companyId });
   };
 
   const handleOwnerChange = (value: string) => {
@@ -433,26 +426,12 @@ export default function ValidationsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas as empresas</SelectItem>
-                {companies?.map((company) => (
+                {(user?.role === 'leader' && user.companies
+                  ? companies?.filter((c) => user.companies?.some((uc) => uc.id === c.id))
+                  : companies
+                )?.map((company) => (
                   <SelectItem key={company.id} value={company.id}>
                     {company.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={filters.department_id ?? 'all'}
-              onValueChange={handleDepartmentChange}
-              disabled={!filters.company_id}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Setor" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os setores</SelectItem>
-                {departments?.map((department) => (
-                  <SelectItem key={department.id} value={department.id}>
-                    {department.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -466,14 +445,20 @@ export default function ValidationsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os responsáveis</SelectItem>
-                {users?.filter((u) => u.is_active).map((user) => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {user.name || user.email}
+                {(user?.role === 'leader' && user
+                  ? [user]
+                  : users?.filter((u) => u.is_active)
+                    ?.filter((u, index, self) => 
+                      index === self.findIndex((us) => us.id === u.id)
+                    )
+                )?.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.name || u.email}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {(filters.company_id || filters.department_id || filters.owner_id) && (
+            {(filters.company_id || filters.owner_id) && (
               <Button variant="ghost" onClick={clearFilters} className="text-muted-foreground">
                 Limpar filtros
               </Button>

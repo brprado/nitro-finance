@@ -7,6 +7,7 @@ import { Loader2, CalendarIcon } from 'lucide-react';
 import { AxiosError } from 'axios';
 import { expensesApi, companiesApi, departmentsApi, categoriesApi, usersApi } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -138,6 +139,7 @@ interface ExpenseFormProps {
 }
 
 export function ExpenseForm({ expense, onSuccess, onCancel }: ExpenseFormProps) {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [calendarOpen, setCalendarOpen] = useState(false);
 
@@ -152,8 +154,8 @@ export function ExpenseForm({ expense, onSuccess, onCancel }: ExpenseFormProps) 
   });
 
   const { data: users } = useQuery({
-    queryKey: ['users'],
-    queryFn: usersApi.getAll,
+    queryKey: ['users-scoped'],
+    queryFn: usersApi.getScoped,
   });
 
   const {
@@ -211,6 +213,7 @@ export function ExpenseForm({ expense, onSuccess, onCancel }: ExpenseFormProps) 
 
   const selectedCompanyId = watch('company_id');
   const expenseType = watch('expense_type');
+  const selectedOwnerId = watch('owner_id');
 
   // Limpar periodicity quando mudar para one_time
   useEffect(() => {
@@ -218,6 +221,17 @@ export function ExpenseForm({ expense, onSuccess, onCancel }: ExpenseFormProps) 
       setValue('periodicity', undefined);
     }
   }, [expenseType, setValue]);
+
+  // Limpar owner_id quando a empresa mudar, se o owner atual não pertence à nova empresa
+  useEffect(() => {
+    if (selectedCompanyId && selectedOwnerId && users) {
+      const currentOwner = users.find((u) => u.id === selectedOwnerId);
+      const ownerBelongsToCompany = currentOwner?.companies?.some((c) => c.id === selectedCompanyId) ?? false;
+      if (!ownerBelongsToCompany) {
+        setValue('owner_id', '');
+      }
+    }
+  }, [selectedCompanyId, users, selectedOwnerId, setValue]);
 
   const { data: departments } = useQuery({
     queryKey: ['departments', selectedCompanyId],
@@ -475,7 +489,10 @@ export function ExpenseForm({ expense, onSuccess, onCancel }: ExpenseFormProps) 
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
               <SelectContent>
-                {companies?.filter(c => c.is_active).map((company) => (
+                {(user?.role === 'leader' && user.companies
+                  ? companies?.filter((c) => c.is_active && user.companies?.some((uc) => uc.id === c.id))
+                  : companies?.filter((c) => c.is_active)
+                )?.map((company) => (
                   <SelectItem key={company.id} value={company.id}>
                     {company.name}
                   </SelectItem>
@@ -498,7 +515,7 @@ export function ExpenseForm({ expense, onSuccess, onCancel }: ExpenseFormProps) 
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
               <SelectContent>
-                {departments?.filter(d => d.is_active).map((department) => (
+                {departments?.filter((d) => d.is_active)?.map((department) => (
                   <SelectItem key={department.id} value={department.id}>
                     {department.name}
                   </SelectItem>
@@ -520,20 +537,36 @@ export function ExpenseForm({ expense, onSuccess, onCancel }: ExpenseFormProps) 
           <Select
             value={watch('owner_id') ?? ''}
             onValueChange={(v) => setValue('owner_id', v)}
+            disabled={!selectedCompanyId}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Selecione" />
+              <SelectValue placeholder={selectedCompanyId ? "Selecione" : "Selecione uma empresa primeiro"} />
             </SelectTrigger>
             <SelectContent>
-              {users?.filter(u => u.is_active).map((user) => (
-                <SelectItem key={user.id} value={user.id}>
-                  {user.name}
-                </SelectItem>
-              ))}
+              {users
+                ?.filter((u) => {
+                  if (!u.is_active) return false;
+                  // Se não há empresa selecionada, não mostrar ninguém
+                  if (!selectedCompanyId) return false;
+                  // Admins podem ser responsáveis em qualquer empresa
+                  if (u.role === 'system_admin' || u.role === 'finance_admin') return true;
+                  // Para outros, verificar se pertencem à empresa
+                  return u.companies?.some((c) => c.id === selectedCompanyId) ?? false;
+                })
+                ?.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.name}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
           {errors.owner_id && (
             <p className="text-sm text-destructive mt-1">{errors.owner_id.message}</p>
+          )}
+          {selectedCompanyId && users && users.filter((u) => u.is_active && ((u.role === 'system_admin' || u.role === 'finance_admin') || (u.companies?.some((c) => c.id === selectedCompanyId) ?? false))).length === 0 && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Nenhum responsável disponível para esta empresa
+            </p>
           )}
         </div>
       </div>

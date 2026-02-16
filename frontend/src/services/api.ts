@@ -75,6 +75,17 @@ export const usersApi = {
     return data;
   },
 
+  getScoped: async (): Promise<User[]> => {
+    if (USE_MOCK) {
+      await delay();
+      return mockUsers.filter(
+        (u) => u.is_active && (u.role === 'leader' || u.role === 'finance_admin' || u.role === 'system_admin')
+      );
+    }
+    const { data } = await apiClient.get<User[]>('/users/scoped');
+    return data;
+  },
+
   getById: async (id: string): Promise<User> => {
     if (USE_MOCK) {
       await delay();
@@ -86,14 +97,14 @@ export const usersApi = {
     return data;
   },
 
-  create: async (userData: Partial<User> & { password: string }): Promise<User> => {
+  create: async (userData: Partial<User> & { password: string; company_ids?: string[] }): Promise<User> => {
     if (USE_MOCK) {
       await delay();
       const newUser: User = {
         id: String(mockUsers.length + 1),
         name: userData.name || '',
         email: userData.email || '',
-        role: userData.role || 'user',
+        role: userData.role || 'leader',
         phone: userData.phone,
         is_active: true,
         departments: [],
@@ -105,7 +116,7 @@ export const usersApi = {
     return data;
   },
 
-  update: async (id: string, userData: Partial<User>): Promise<User> => {
+  update: async (id: string, userData: Partial<User> & { company_ids?: string[] }): Promise<User> => {
     if (USE_MOCK) {
       await delay();
       const index = mockUsers.findIndex(u => u.id === id);
@@ -140,7 +151,7 @@ export const companiesApi = {
       await delay();
       return mockCompanies;
     }
-    const { data } = await apiClient.get<Company[]>('/companies');
+    const { data } = await apiClient.get<Company[]>('/companies/me');
     return data;
   },
 
@@ -210,8 +221,10 @@ export const departmentsApi = {
       }
       return mockDepartments;
     }
+    // Usar /departments/me que funciona para todos os usuários e retorna setores baseado no escopo
+    // Para System Admin e Finance Admin retorna todos os setores
     const params = companyId ? { company_id: companyId } : {};
-    const { data } = await apiClient.get<Department[]>('/departments', { params });
+    const { data } = await apiClient.get<Department[]>('/departments/me', { params });
     return data;
   },
 
@@ -281,7 +294,8 @@ export const categoriesApi = {
       await delay();
       return mockCategories;
     }
-    const { data } = await apiClient.get<Category[]>('/categories');
+    // Usar /categories/me que funciona para todos os usuários autenticados
+    const { data } = await apiClient.get<Category[]>('/categories/me');
     return data;
   },
 
@@ -395,7 +409,7 @@ export const expensesApi = {
       const newExpense: Expense = {
         id: String(mockExpenses.length + 1),
         ...expenseData,
-        status: 'draft',
+        status: 'active',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };

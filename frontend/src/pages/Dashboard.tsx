@@ -15,7 +15,8 @@ import {
   BarChart3,
   LineChart as LineChartIcon,
 } from 'lucide-react';
-import { dashboardApi, companiesApi, departmentsApi } from '@/services/api';
+import { dashboardApi, companiesApi } from '@/services/api';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,7 +35,6 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { ExpenseLineChart } from '@/components/dashboard/ExpenseLineChart';
 import { ExpensePieChart } from '@/components/dashboard/ExpensePieChart';
 import { ExpenseBarChart } from '@/components/dashboard/ExpenseBarChart';
-import { ExpenseAreaChart } from '@/components/dashboard/ExpenseAreaChart';
 import { TopExpensesChart } from '@/components/dashboard/TopExpensesChart';
 
 function MetricCard({
@@ -89,6 +89,7 @@ function getMonthOptions() {
 const DEFAULT_EXCHANGE_RATE = 5.50;
 
 export default function DashboardPage() {
+  const { user } = useAuth();
   const [filters, setFilters] = useState<DashboardFilters>({});
   const [currency, setCurrency] = useState<Currency>('BRL');
   const selectedCompanyId = filters.company_id;
@@ -104,12 +105,6 @@ export default function DashboardPage() {
   const { data: companies } = useQuery({
     queryKey: ['companies'],
     queryFn: companiesApi.getAll,
-  });
-
-  const { data: departments } = useQuery({
-    queryKey: ['departments', selectedCompanyId],
-    queryFn: () => departmentsApi.getAll(selectedCompanyId),
-    enabled: !!selectedCompanyId,
   });
 
   const monthOptions = getMonthOptions();
@@ -144,11 +139,6 @@ export default function DashboardPage() {
     queryFn: () => dashboardApi.getTopExpenses(filters, 10),
   });
 
-  const { data: statusDistribution, isLoading: statusLoading } = useQuery({
-    queryKey: ['expenses-by-status', filters],
-    queryFn: () => dashboardApi.getExpensesByStatus(filters),
-  });
-
   const { data: recentExpenses, isLoading: expensesLoading } = useQuery({
     queryKey: ['recent-expenses', filters],
     queryFn: () => dashboardApi.getRecentExpenses(5, filters),
@@ -161,7 +151,6 @@ export default function DashboardPage() {
 
   const hasActiveFilters = !!(
     filters.company_id ||
-    filters.department_id ||
     filters.month
   );
 
@@ -191,7 +180,6 @@ export default function DashboardPage() {
                 setFilters((prev) => ({
                   ...prev,
                   company_id: v === 'all' ? undefined : v,
-                  department_id: undefined,
                 }))
               }
             >
@@ -200,31 +188,12 @@ export default function DashboardPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas as empresas</SelectItem>
-                {companies?.map((company) => (
+                {(user?.role === 'leader' && user.companies
+                  ? companies?.filter((c) => user.companies?.some((uc) => uc.id === c.id))
+                  : companies
+                )?.map((company) => (
                   <SelectItem key={company.id} value={company.id}>
                     {company.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={filters.department_id ?? 'all'}
-              onValueChange={(v) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  department_id: v === 'all' ? undefined : v,
-                }))
-              }
-              disabled={!selectedCompanyId}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Setor" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os setores</SelectItem>
-                {departments?.map((dept) => (
-                  <SelectItem key={dept.id} value={dept.id}>
-                    {dept.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -464,29 +433,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Gráfico de Área - Status */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
-            Distribuição de Despesas por Status
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {statusLoading ? (
-            <div className="h-[300px] flex items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : statusDistribution?.items && statusDistribution.items.length > 0 ? (
-            <ExpenseAreaChart data={statusDistribution.items} currency={currency} exchangeRate={DEFAULT_EXCHANGE_RATE} />
-          ) : (
-            <p className="text-muted-foreground text-center py-8">
-              Nenhum dado disponível
-            </p>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Recent Data */}
       <div className="grid gap-6 lg:grid-cols-2">

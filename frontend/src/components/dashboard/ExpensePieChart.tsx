@@ -10,18 +10,24 @@ interface ExpensePieChartProps {
   exchangeRate?: number;
 }
 
+const CHART_PRIMARY = '#1DBA9B';
+
+/** Cores contrastantes entre si para cada fatia do gráfico de pizza */
 const COLORS = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-5))',
+  CHART_PRIMARY,  /* teal */
+  '#F59E0B',      /* amber */
+  '#2563EB',      /* blue */
+  '#DC2626',      /* red */
+  '#7C3AED',      /* violet */
+  '#0EA5E9',      /* sky */
+  '#EC4899',      /* pink */
+  '#10B981',      /* emerald */
 ];
 
 const chartConfig = {
   total_value: {
     label: 'Valor',
-    color: 'hsl(var(--chart-1))',
+    color: CHART_PRIMARY,
   },
 };
 
@@ -35,9 +41,20 @@ export function ExpensePieChart({ data, title, currency = 'BRL', exchangeRate = 
 
   const chartData = data.map((item) => ({
     name: item.category_name,
-    value: convertValue(item.total_value),
-    percentage: item.percentage,
+    value: convertValue(Number(item.total_value)),
+    percentage: Number(item.percentage) || 0,
   }));
+
+  if (!chartData.length) {
+    return (
+      <div className="space-y-2">
+        {title && <h3 className="text-sm font-semibold">{title}</h3>}
+        <div className="h-[300px] flex items-center justify-center text-muted-foreground text-sm">
+          Nenhum dado para exibir
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2">
@@ -49,13 +66,15 @@ export function ExpensePieChart({ data, title, currency = 'BRL', exchangeRate = 
             cx="50%"
             cy="50%"
             labelLine={false}
-            label={({ name, percentage }) => `${name}: ${percentage.toFixed(1)}%`}
+            label={({ name, percentage, percent }: { name: string; percentage?: number; percent?: number }) =>
+              `${name}: ${(percentage ?? percent ?? 0).toFixed(1)}%`
+            }
             outerRadius={80}
-            fill="hsl(var(--chart-1))"
+            fill={CHART_PRIMARY}
             dataKey="value"
           >
             {chartData.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              <Cell key={`cell-${entry.name}-${index}`} fill={COLORS[index % COLORS.length]} />
             ))}
           </Pie>
           <ChartTooltip

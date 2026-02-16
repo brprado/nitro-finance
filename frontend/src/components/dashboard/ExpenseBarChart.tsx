@@ -18,10 +18,12 @@ interface ExpenseBarChartProps {
   exchangeRate?: number;
 }
 
+const CHART_PRIMARY = '#1DBA9B';
+
 const chartConfig = {
   value: {
     label: 'Valor',
-    color: 'hsl(var(--chart-1))',
+    color: CHART_PRIMARY,
   },
 };
 
@@ -58,7 +60,7 @@ export function ExpenseBarChart({ data, title, dataKey = 'value', nameKey = 'nam
               />
             }
           />
-          <Bar dataKey={dataKey} fill="hsl(var(--chart-1))" radius={[0, 4, 4, 0]} />
+          <Bar dataKey={dataKey} fill={CHART_PRIMARY} radius={[0, 4, 4, 0]} />
         </BarChart>
       </ChartContainer>
     </div>

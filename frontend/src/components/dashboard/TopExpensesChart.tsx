@@ -10,10 +10,12 @@ interface TopExpensesChartProps {
   exchangeRate?: number;
 }
 
+const CHART_PRIMARY = '#1DBA9B';
+
 const chartConfig = {
   value_brl: {
     label: 'Valor (BRL)',
-    color: 'hsl(var(--chart-1))',
+    color: CHART_PRIMARY,
   },
 };
 
@@ -71,7 +73,7 @@ export function TopExpensesChart({ data, title, currency = 'BRL', exchangeRate =
               />
             }
           />
-          <Bar dataKey="value_brl" fill="hsl(var(--chart-1))" radius={[0, 4, 4, 0]} />
+          <Bar dataKey="value_brl" fill={CHART_PRIMARY} radius={[0, 4, 4, 0]} />
         </BarChart>
       </ChartContainer>
     </div>

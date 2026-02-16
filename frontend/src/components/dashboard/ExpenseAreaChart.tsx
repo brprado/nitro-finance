@@ -10,25 +10,22 @@ interface ExpenseAreaChartProps {
   exchangeRate?: number;
 }
 
+const CHART_PRIMARY = '#1DBA9B';
+
 const chartConfig = {
   total_value: {
     label: 'Valor Total',
-    color: 'hsl(var(--chart-1))',
+    color: CHART_PRIMARY,
   },
   count: {
     label: 'Quantidade',
-    color: 'hsl(var(--chart-2))',
+    color: CHART_PRIMARY,
   },
 };
 
 const statusLabels: Record<string, string> = {
-  draft: 'Rascunho',
-  in_review: 'Em Revisão',
   active: 'Ativa',
-  cancellation_requested: 'Cancelamento Solicitado',
   cancelled: 'Cancelada',
-  suspended: 'Suspensa',
-  migrated: 'Migrada',
 };
 
 export function ExpenseAreaChart({ data, title, currency = 'BRL', exchangeRate = 5.50 }: ExpenseAreaChartProps) {
@@ -69,8 +66,8 @@ export function ExpenseAreaChart({ data, title, currency = 'BRL', exchangeRate =
           <Area
             type="monotone"
             dataKey="total_value"
-            stroke="hsl(var(--chart-1))"
-            fill="hsl(var(--chart-1))"
+            stroke={CHART_PRIMARY}
+            fill={CHART_PRIMARY}
             fillOpacity={0.6}
           />
         </AreaChart>

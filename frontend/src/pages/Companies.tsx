@@ -53,7 +53,11 @@ export default function CompaniesPage() {
   const createMutation = useMutation({
     mutationFn: companiesApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['companies'] });
+      queryClient.invalidateQueries({ queryKey: ['companies'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['departments'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['expenses'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['validations'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'], exact: false });
       setIsFormOpen(false);
       setFormName('');
       toast({ title: 'Empresa criada com sucesso!' });
@@ -64,7 +68,11 @@ export default function CompaniesPage() {
     mutationFn: ({ id, data }: { id: string; data: Partial<Company> }) =>
       companiesApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['companies'] });
+      queryClient.invalidateQueries({ queryKey: ['companies'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['departments'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['expenses'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['validations'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'], exact: false });
       setIsFormOpen(false);
       setEditingCompany(null);
       setFormName('');
@@ -75,7 +83,11 @@ export default function CompaniesPage() {
   const deleteMutation = useMutation({
     mutationFn: companiesApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['companies'] });
+      queryClient.invalidateQueries({ queryKey: ['companies'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['departments'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['expenses'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['validations'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'], exact: false });
       setDeletingCompany(null);
       toast({ title: 'Empresa removida com sucesso!' });
     },

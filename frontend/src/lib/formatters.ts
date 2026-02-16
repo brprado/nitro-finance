@@ -5,7 +5,7 @@ import {
   Calendar,
   XCircle,
 } from 'lucide-react';
-import type { ExpenseStatus, AlertType, Currency } from '@/types';
+import type { AlertType, Currency } from '@/types';
 
 export function formatCurrency(value: number, currency: Currency = 'BRL'): string {
   const locale = currency === 'BRL' ? 'pt-BR' : 'en-US';
@@ -46,28 +46,18 @@ export function formatMonth(monthString: string): string {
   }).format(date);
 }
 
-export function getStatusLabel(status: ExpenseStatus): string {
-  const labels: Record<ExpenseStatus, string> = {
-    draft: 'Rascunho',
-    in_review: 'Em Revisão',
+export function getStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
     active: 'Ativo',
-    cancellation_requested: 'Cancelamento Solicitado',
     cancelled: 'Cancelado',
-    suspended: 'Suspenso',
-    migrated: 'Migrado',
   };
   return labels[status] || status;
 }
 
-export function getStatusBadgeVariant(status: ExpenseStatus): 'default' | 'secondary' | 'destructive' | 'outline' {
-  const variants: Record<ExpenseStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-    draft: 'secondary',
-    in_review: 'outline',
+export function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+  const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     active: 'default',
-    cancellation_requested: 'outline',
     cancelled: 'destructive',
-    suspended: 'destructive',
-    migrated: 'secondary',
   };
   return variants[status] || 'secondary';
 }
@@ -110,7 +100,6 @@ export function getRoleLabel(role: string): string {
     finance_admin: 'Finance Admin',
     system_admin: 'System Admin',
     leader: 'Líder',
-    user: 'Usuário',
   };
   return labels[role] || role;
 }

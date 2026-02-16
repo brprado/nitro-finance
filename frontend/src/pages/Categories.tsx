@@ -53,10 +53,19 @@ export default function CategoriesPage() {
   const createMutation = useMutation({
     mutationFn: categoriesApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ['categories'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['expenses'], exact: false });
       setIsFormOpen(false);
       setFormName('');
       toast({ title: 'Categoria criada com sucesso!' });
+    },
+    onError: (error: any) => {
+      const errorMessage = error?.response?.data?.detail || 'Erro ao criar categoria';
+      toast({
+        title: 'Erro ao criar categoria',
+        description: errorMessage,
+        variant: 'destructive',
+      });
     },
   });
 
@@ -64,20 +73,39 @@ export default function CategoriesPage() {
     mutationFn: ({ id, data }: { id: string; data: Partial<Category> }) =>
       categoriesApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ['categories'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['expenses'], exact: false });
       setIsFormOpen(false);
       setEditingCategory(null);
       setFormName('');
       toast({ title: 'Categoria atualizada com sucesso!' });
+    },
+    onError: (error: any) => {
+      const errorMessage = error?.response?.data?.detail || 'Erro ao atualizar categoria';
+      toast({
+        title: 'Erro ao atualizar categoria',
+        description: errorMessage,
+        variant: 'destructive',
+      });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: categoriesApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ['categories'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['expenses'], exact: false });
       setDeletingCategory(null);
       toast({ title: 'Categoria removida com sucesso!' });
+    },
+    onError: (error: any) => {
+      const errorMessage = error?.response?.data?.detail || 'Erro ao remover categoria';
+      toast({
+        title: 'Erro ao remover categoria',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+      setDeletingCategory(null);
     },
   });
 

@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Mail, Lock, Loader2 } from 'lucide-react';
+import { AxiosError } from 'axios';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,10 +42,19 @@ export default function LoginPage() {
       });
       navigate('/dashboard');
     } catch (error) {
+      let errorMessage = 'Email ou senha inválidos.';
+      
+      // Tentar obter mensagem específica do backend
+      if (error instanceof AxiosError && error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
       toast({
         variant: 'destructive',
         title: 'Erro ao fazer login',
-        description: 'Email ou senha inválidos.',
+        description: errorMessage,
       });
     } finally {
       setIsSubmitting(false);
@@ -129,20 +139,6 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
-
-          {/* Demo credentials hint */}
-          <div className="mt-6 p-4 bg-muted rounded-lg">
-            <p className="text-xs text-muted-foreground text-center">
-              <strong>Demo:</strong> admin@nitro.com / password123
-            </p>
-          </div>
-
-          {/* Footer link */}
-          <div className="text-center mt-6">
-            <a href="#" className="text-sm text-primary hover:underline">
-              Esqueceu a senha?
-            </a>
-          </div>
         </div>
       </div>
     </div>

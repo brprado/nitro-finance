@@ -67,7 +67,11 @@ export default function DepartmentsPage() {
   const createMutation = useMutation({
     mutationFn: departmentsApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['departments'] });
+      queryClient.invalidateQueries({ queryKey: ['departments'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['users'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['expenses'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['validations'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'], exact: false });
       setIsFormOpen(false);
       setFormName('');
       setFormCompanyId('');
@@ -79,7 +83,11 @@ export default function DepartmentsPage() {
     mutationFn: ({ id, data }: { id: string; data: Partial<Department> }) =>
       departmentsApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['departments'] });
+      queryClient.invalidateQueries({ queryKey: ['departments'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['users'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['expenses'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['validations'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'], exact: false });
       setIsFormOpen(false);
       setEditingDepartment(null);
       setFormName('');
@@ -91,7 +99,11 @@ export default function DepartmentsPage() {
   const deleteMutation = useMutation({
     mutationFn: departmentsApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['departments'] });
+      queryClient.invalidateQueries({ queryKey: ['departments'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['users'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['expenses'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['validations'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'], exact: false });
       setDeletingDepartment(null);
       toast({ title: 'Setor removido com sucesso!' });
     },
