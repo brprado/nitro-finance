@@ -1,3 +1,7 @@
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -6,10 +10,44 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.api.v1.endpoints import auth, users, companies, departments, categories, expenses, expense_validations, alerts, dashboard
 
+logger = logging.getLogger(__name__)
+
+RENEWAL_CHECK_INTERVAL_SECONDS = 6 * 3600  # 6 horas
+
+
+async def _renewal_alert_loop():
+    """Loop em background que verifica alertas de renovação a cada 6 horas."""
+    from app.tasks.alert_tasks import check_and_create_renewal_alerts_7_3_1
+
+    while True:
+        try:
+            logger.info("Iniciando verificação automática de alertas de renovação...")
+            result = await asyncio.to_thread(check_and_create_renewal_alerts_7_3_1)
+            logger.info("Verificação de renovação concluída: %s", result)
+        except Exception:
+            logger.exception("Erro na verificação automática de alertas de renovação")
+        await asyncio.sleep(RENEWAL_CHECK_INTERVAL_SECONDS)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Gerencia tarefas em background durante o ciclo de vida da aplicação."""
+    task = asyncio.create_task(_renewal_alert_loop())
+    logger.info("Scheduler de alertas de renovação iniciado (intervalo: %ds)", RENEWAL_CHECK_INTERVAL_SECONDS)
+    yield
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    logger.info("Scheduler de alertas de renovação encerrado")
+
+
 app = FastAPI(
     title="Nitro Finance API",
     description="Sistema de gestão de despesas e assinaturas corporativas",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # CORS para o frontend (dev: localhost:5173 ou 8080)

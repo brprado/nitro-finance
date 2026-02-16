@@ -1,155 +1,122 @@
-from datetime import date, datetime, timedelta
+import logging
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
-from app.services import expense_validation_service, alert_service
-from app.models.expense_validation import ExpenseValidation, ValidationStatus
+from app.services import alert_service
+from app.models.alert import Alert, AlertType, AlertStatus
 from app.models.expense import Expense, ExpenseStatus
+from app.models.expense_validation import ExpenseValidation, ValidationStatus
 from app.models.user import User
 
+logger = logging.getLogger(__name__)
 
-def check_and_create_validation_overdue_alerts() -> dict:
+RENEWAL_ALERT_DAYS = [7, 3, 1]
+
+
+def _has_approved_validation(db: Session, expense_id, renewal_date) -> bool:
+    """Verifica se existe validação aprovada para a despesa no mês da renovação."""
+    validation_month = renewal_date.replace(day=1)
+    return db.query(ExpenseValidation).filter(
+        ExpenseValidation.expense_id == expense_id,
+        ExpenseValidation.status == ValidationStatus.APPROVED,
+        ExpenseValidation.validation_month == validation_month,
+    ).first() is not None
+
+
+def _alert_already_exists(db: Session, expense_id, days_until: int) -> bool:
+    """Verifica se já existe alerta para essa despesa com esse número de dias."""
+    title_pattern = f"Renovação em {days_until} dia"
+    return db.query(Alert).filter(
+        Alert.expense_id == expense_id,
+        Alert.alert_type == AlertType.RENEWAL_UPCOMING,
+        Alert.title.ilike(f"%{title_pattern}%"),
+        Alert.status.in_([AlertStatus.PENDING, AlertStatus.SENT]),
+    ).first() is not None
+
+
+def check_and_create_renewal_alerts_7_3_1() -> dict:
     """
-    Verifica validações vencidas e cria alertas para os líderes.
-    Executa diariamente para verificar pendências após o prazo de 3 dias.
+    Verifica despesas ativas com renewal_date nos próximos 7 dias
+    e cria alertas para 7, 3 e 1 dia antes da renovação.
+
+    - O alerta é enviado ao owner (responsável) da despesa.
+    - Se a despesa já possui validação aprovada para o mês da renovação,
+      nenhum alerta é criado.
+    - Alertas duplicados (mesmo expense + mesmo nº de dias) são ignorados.
     """
     db: Session = SessionLocal()
     try:
-        # Calcular data limite (3 dias após o primeiro dia do mês atual)
         today = datetime.now().date()
-        first_day_current_month = today.replace(day=1)
-        deadline = first_day_current_month + timedelta(days=3)
-        
-        # Se ainda estamos nos primeiros 3 dias do mês, considerar o mês anterior
-        if today <= deadline:
-            if first_day_current_month.month == 1:
-                previous_month = first_day_current_month.replace(year=first_day_current_month.year - 1, month=12)
-            else:
-                previous_month = first_day_current_month.replace(month=first_day_current_month.month - 1)
-            deadline = previous_month + timedelta(days=3)
-        
-        # Buscar validações vencidas
-        overdue_validations = expense_validation_service.get_overdue_validations(db, deadline)
-        
+        max_ahead = today + timedelta(days=max(RENEWAL_ALERT_DAYS))
+
+        expenses = db.query(Expense).filter(
+            Expense.status == ExpenseStatus.ACTIVE,
+            Expense.renewal_date.isnot(None),
+            Expense.renewal_date >= today,
+            Expense.renewal_date <= max_ahead,
+        ).all()
+
         alerts_created = 0
+        skipped_validated = 0
+        skipped_duplicate = 0
         errors = []
-        
-        for validation in overdue_validations:
+
+        for expense in expenses:
+            days_until = (expense.renewal_date - today).days
+
+            if days_until not in RENEWAL_ALERT_DAYS:
+                continue
+
             try:
-                # Buscar o validador (líder)
-                validator = db.query(User).filter(User.id == validation.validator_id).first()
-                
-                if validator and validator.is_active:
-                    # Verificar se já existe alerta para esta validação
-                    from app.models.alert import Alert, AlertType, AlertStatus
-                    existing_alert = db.query(Alert).filter(
-                        Alert.validation_id == validation.id,
-                        Alert.alert_type == AlertType.VALIDATION_OVERDUE,
-                        Alert.status.in_([AlertStatus.PENDING, AlertStatus.SENT])
-                    ).first()
-                    
-                    if not existing_alert:
-                        alert_service.create_validation_overdue_alert(
-                            db=db,
-                            validation=validation,
-                            recipient=validator
-                        )
-                        alerts_created += 1
+                if _has_approved_validation(db, expense.id, expense.renewal_date):
+                    skipped_validated += 1
+                    continue
+
+                if _alert_already_exists(db, expense.id, days_until):
+                    skipped_duplicate += 1
+                    continue
+
+                alert_service.create_renewal_upcoming_alert(db, expense, days_until)
+                alerts_created += 1
+                logger.info(
+                    "Alerta de renovação criado: %s em %d dia(s) para owner %s",
+                    expense.service_name, days_until, expense.owner_id,
+                )
             except Exception as e:
-                errors.append(f"Erro ao criar alerta para validação {validation.id}: {str(e)}")
-        
-        return {
+                errors.append(f"Erro despesa {expense.id}: {e}")
+                logger.exception("Erro ao criar alerta para despesa %s", expense.id)
+
+        result = {
             "success": True,
-            "overdue_validations_found": len(overdue_validations),
+            "expenses_checked": len(expenses),
             "alerts_created": alerts_created,
-            "errors": errors
+            "skipped_validated": skipped_validated,
+            "skipped_duplicate": skipped_duplicate,
+            "errors": errors,
         }
+        logger.info("Verificação de renovação concluída: %s", result)
+        return result
     except Exception as e:
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        logger.exception("Erro na verificação de renovação")
+        return {"success": False, "error": str(e)}
     finally:
         db.close()
 
 
 def check_and_create_renewal_alerts(days_ahead: int = 7) -> dict:
-    """
-    Verifica despesas com renovação próxima e cria alertas.
-    
-    Args:
-        days_ahead: Quantos dias antes da renovação criar o alerta (padrão: 7 dias)
-    """
-    db: Session = SessionLocal()
-    try:
-        today = datetime.now().date()
-        target_date = today + timedelta(days=days_ahead)
-        
-        # Buscar despesas ativas com renewal_date próximo
-        expenses = db.query(Expense).filter(
-            Expense.status == ExpenseStatus.ACTIVE,
-            Expense.renewal_date.isnot(None),
-            Expense.renewal_date <= target_date,
-            Expense.renewal_date >= today
-        ).all()
-        
-        alerts_created = 0
-        errors = []
-        
-        for expense in expenses:
-            try:
-                days_until = (expense.renewal_date - today).days
-                
-                # Verificar se já existe alerta para esta renovação
-                from app.models.alert import Alert, AlertType, AlertStatus
-                existing_alert = db.query(Alert).filter(
-                    Alert.expense_id == expense.id,
-                    Alert.alert_type.in_([AlertType.RENEWAL_UPCOMING, AlertType.RENEWAL_DUE]),
-                    Alert.status.in_([AlertStatus.PENDING, AlertStatus.SENT])
-                ).first()
-                
-                if not existing_alert:
-                    if days_until == 0:
-                        # Renovação hoje
-                        alert_service.create_renewal_due_alert(db, expense)
-                    else:
-                        # Renovação em X dias
-                        alert_service.create_renewal_upcoming_alert(db, expense, days_until)
-                    
-                    alerts_created += 1
-            except Exception as e:
-                errors.append(f"Erro ao criar alerta para despesa {expense.id}: {str(e)}")
-        
-        return {
-            "success": True,
-            "expenses_found": len(expenses),
-            "alerts_created": alerts_created,
-            "errors": errors
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e)
-        }
-    finally:
-        db.close()
+    """Wrapper mantido para compatibilidade com endpoint existente."""
+    return check_and_create_renewal_alerts_7_3_1()
 
 
 def process_all_alerts() -> dict:
-    """
-    Processa todos os alertas pendentes e tenta enviá-los.
-    """
+    """Processa todos os alertas pendentes."""
     db: Session = SessionLocal()
     try:
         stats = alert_service.process_pending_alerts(db, limit=100)
-        return {
-            "success": True,
-            **stats
-        }
+        return {"success": True, **stats}
     except Exception as e:
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        logger.exception("Erro ao processar alertas")
+        return {"success": False, "error": str(e)}
     finally:
         db.close()
