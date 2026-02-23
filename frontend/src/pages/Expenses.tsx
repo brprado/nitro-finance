@@ -91,7 +91,7 @@ function getPageNumbers(total: number, current: number): (number | 'ellipsis')[]
 }
 
 export default function ExpensesPage() {
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, isLeader, user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -444,23 +444,21 @@ export default function ExpensesPage() {
                             <Eye className="h-4 w-4 mr-2" />
                             Ver detalhes
                           </DropdownMenuItem>
-                          {isAdmin && (
-                            <>
-                              <DropdownMenuItem onClick={() => handleEdit(expense)}>
-                                <Pencil className="h-4 w-4 mr-2" />
-                                Editar
-                              </DropdownMenuItem>
-                              {expense.status === 'active' && (
-                                <DropdownMenuItem
-                                  className="text-destructive"
-                                  onClick={() => setCancelExpense(expense)}
-                                  disabled={cancelMutation.isPending}
-                                >
-                                  <XCircle className="h-4 w-4 mr-2" />
-                                  Cancelar
-                                </DropdownMenuItem>
-                              )}
-                            </>
+                          {isLeader && (
+                            <DropdownMenuItem onClick={() => handleEdit(expense)}>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Editar
+                            </DropdownMenuItem>
+                          )}
+                          {isAdmin && expense.status === 'active' && (
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => setCancelExpense(expense)}
+                              disabled={cancelMutation.isPending}
+                            >
+                              <XCircle className="h-4 w-4 mr-2" />
+                              Cancelar
+                            </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
