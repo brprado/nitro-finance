@@ -142,6 +142,28 @@ def _last_day_of_month(year: int, month: int) -> int:
     return last_day.day
 
 
+def _advance_expense_renewal_date_once(expense: Expense) -> None:
+    """
+    Avança a renewal_date da despesa em um ciclo (ex.: mensal 23/02 -> 23/03).
+    Modifica expense.renewal_date in-place. Não faz commit.
+    """
+    if not expense.renewal_date or not expense.periodicity:
+        return
+    periodicity_months = {
+        Periodicity.MONTHLY: 1,
+        Periodicity.QUARTERLY: 3,
+        Periodicity.SEMIANNUAL: 6,
+        Periodicity.ANNUAL: 12,
+    }
+    interval = periodicity_months.get(expense.periodicity, 1)
+    new_date = expense.renewal_date
+    month = new_date.month + interval
+    year = new_date.year + (month - 1) // 12
+    month = (month - 1) % 12 + 1
+    day = min(new_date.day, _last_day_of_month(year, month))
+    expense.renewal_date = date(year, month, day)
+
+
 def advance_renewal_dates(db: Session) -> int:
     """
     Avança renewal_date para a próxima ocorrência futura baseada na periodicidade.
@@ -306,10 +328,14 @@ def approve(db: Session, validation_id: UUID, validator_id: UUID) -> ExpenseVali
     validation.validator_id = validator_id  # Preencher com quem está aprovando
     validation.validated_at = datetime.now(timezone.utc)
     validation.updated_at = datetime.now(timezone.utc)
-    
+
+    # Avançar data de renovação da despesa para o próximo ciclo
+    if validation.expense:
+        _advance_expense_renewal_date_once(validation.expense)
+
     db.commit()
     db.refresh(validation)
-    
+
     return validation
 
 

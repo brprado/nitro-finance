@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Filter, MoreHorizontal, Eye, Pencil, XCircle, Loader2 } from 'lucide-react';
 import { expensesApi, companiesApi, usersApi, categoriesApi } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -80,6 +81,13 @@ export default function ExpensesPage() {
     queryFn: () => expensesApi.getAll(filters),
   });
 
+  const sortedExpenses = useMemo(() => {
+    if (!expenses?.length) return expenses ?? [];
+    return [...expenses].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+  }, [expenses]);
+
   const { data: companies } = useQuery({
     queryKey: ['companies'],
     queryFn: companiesApi.getAll,
@@ -136,7 +144,8 @@ export default function ExpensesPage() {
     (filters.owner_ids?.length ?? 0) > 0 ||
     (filters.category_ids?.length ?? 0) > 0 ||
     (filters.status?.length ?? 0) > 0 ||
-    (filters.expense_type?.length ?? 0) > 0;
+    (filters.expense_type?.length ?? 0) > 0 ||
+    (filters.service_name?.trim?.()?.length ?? 0) > 0;
 
   const handleEdit = (expense: Expense) => {
     setEditingExpense(expense);
@@ -185,6 +194,17 @@ export default function ExpensesPage() {
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-wrap items-end gap-4">
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">Nome</Label>
+              <Input
+                placeholder="Buscar por nome..."
+                value={filters.service_name ?? ''}
+                onChange={(e) =>
+                  setFilters({ ...filters, service_name: e.target.value || undefined })
+                }
+                className="h-9 w-[220px]"
+              />
+            </div>
             <MultiSelect
               label="Empresa"
               placeholder="Todas as empresas"
@@ -251,7 +271,7 @@ export default function ExpensesPage() {
                 <Skeleton key={i} className="h-16 w-full" />
               ))}
             </div>
-          ) : expenses?.length === 0 ? (
+          ) : sortedExpenses?.length === 0 ? (
             <div className="p-12 text-center">
               <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
                 <Search className="h-6 w-6 text-muted-foreground" />
@@ -285,7 +305,7 @@ export default function ExpensesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {expenses?.map((expense) => (
+                {sortedExpenses?.map((expense) => (
                   <TableRow 
                     key={expense.id} 
                     className={`hover:bg-muted/50 transition-colors ${

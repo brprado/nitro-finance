@@ -41,6 +41,7 @@ def list_expenses(
     category_ids: list[UUID] | None = Query(None, description="Filtrar por categorias"),
     status: list[ExpenseStatus] | None = Query(None, description="Filtrar por status"),
     expense_type: list[ExpenseType] | None = Query(None, description="Filtrar por tipo"),
+    service_name: str | None = Query(None, description="Busca parcial por nome"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -115,6 +116,7 @@ def list_expenses(
         category_ids=category_ids,
         statuses=statuses,
         expense_types=expense_types,
+        service_name=service_name,
     )
     return expenses
 

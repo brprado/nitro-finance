@@ -5,6 +5,8 @@ import { validationsApi, companiesApi, usersApi } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -80,7 +82,7 @@ function buildValidationsCsv(
   formatCurrencyFn: (v: number, currency?: string) => string,
   formatMonthFn: (s: string) => string
 ): string {
-  const header = 'Código;Serviço;Empresa;Setor;Responsável;Valor;Status;Mês;Validado por;Data';
+  const header = 'Código;Serviço;Empresa;Setor;Responsável;Valor;Status;Mês;Data de renovação;Validado por;Data';
   const statusLabels: Record<string, string> = {
     pending: 'Pendente',
     approved: 'Aprovada',
@@ -99,9 +101,10 @@ function buildValidationsCsv(
         : '';
     const status = statusLabels[v.status] ?? v.status;
     const month = v.validation_month ? formatMonthFn(v.validation_month) : '';
+    const renewalDate = expense?.renewal_date ? formatDate(expense.renewal_date) : '';
     const validator = v.validator?.name ?? '';
     const date = v.validated_at ? formatDate(v.validated_at) : '';
-    return [code, service, company, department, owner, value, status, month, validator, date]
+    return [code, service, company, department, owner, value, status, month, renewalDate, validator, date]
       .map(escapeCsvCell)
       .join(';');
   });
@@ -132,6 +135,7 @@ export default function ValidationsPage() {
   const [filters, setFilters] = useState<{
     company_id?: string;
     owner_id?: string;
+    service_name?: string;
   }>({});
 
   const monthOptions = getMonthOptions();
@@ -194,7 +198,7 @@ export default function ValidationsPage() {
     ? pendingValidations || []
     : historyValidations || [];
 
-  // Aplicar filtros de empresa e responsável
+  // Aplicar filtros de empresa, responsável e nome
   const filteredValidations = useMemo(() => {
     return validations.filter((validation) => {
       if (filters.company_id && validation.expense?.company?.id !== filters.company_id) {
@@ -203,9 +207,13 @@ export default function ValidationsPage() {
       if (filters.owner_id && validation.expense?.owner?.id !== filters.owner_id) {
         return false;
       }
+      if (filters.service_name) {
+        const term = filters.service_name.toLowerCase();
+        if (!validation.expense?.service_name?.toLowerCase().includes(term)) return false;
+      }
       return true;
     });
-  }, [validations, filters.company_id, filters.owner_id]);
+  }, [validations, filters.company_id, filters.owner_id, filters.service_name]);
 
   // Calcular totais
   const totals = useMemo(() => {
@@ -414,14 +422,27 @@ export default function ValidationsPage() {
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">Filtros:</span>
-            <Select
-              value={filters.company_id ?? 'all'}
-              onValueChange={handleCompanyChange}
-            >
-              <SelectTrigger className="w-[200px]">
+          <div className="flex flex-wrap items-end gap-3">
+            <Filter className="h-4 w-4 text-muted-foreground mb-2" />
+            <span className="text-sm font-medium text-muted-foreground mb-2">Filtros:</span>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">Nome</Label>
+              <Input
+                placeholder="Buscar por nome..."
+                value={filters.service_name ?? ''}
+                onChange={(e) =>
+                  setFilters({ ...filters, service_name: e.target.value || undefined })
+                }
+                className="h-9 w-[220px]"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">Empresa</Label>
+              <Select
+                value={filters.company_id ?? 'all'}
+                onValueChange={handleCompanyChange}
+              >
+                <SelectTrigger className="h-9 w-[200px]">
                 <SelectValue placeholder="Empresa" />
               </SelectTrigger>
               <SelectContent>
@@ -435,14 +456,17 @@ export default function ValidationsPage() {
                   </SelectItem>
                 ))}
               </SelectContent>
-            </Select>
-            <Select
-              value={filters.owner_id ?? 'all'}
-              onValueChange={handleOwnerChange}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Responsável" />
-              </SelectTrigger>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">Responsável</Label>
+              <Select
+                value={filters.owner_id ?? 'all'}
+                onValueChange={handleOwnerChange}
+              >
+                <SelectTrigger className="h-9 w-[200px]">
+                  <SelectValue placeholder="Responsável" />
+                </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os responsáveis</SelectItem>
                 {(user?.role === 'leader' && user
@@ -457,8 +481,9 @@ export default function ValidationsPage() {
                   </SelectItem>
                 ))}
               </SelectContent>
-            </Select>
-            {(filters.company_id || filters.owner_id) && (
+              </Select>
+            </div>
+            {(filters.company_id || filters.owner_id || filters.service_name) && (
               <Button variant="ghost" onClick={clearFilters} className="text-muted-foreground">
                 Limpar filtros
               </Button>
@@ -560,6 +585,7 @@ export default function ValidationsPage() {
                         <TableHead className="font-semibold text-right">Valor</TableHead>
                         <TableHead className="font-semibold">Status</TableHead>
                         <TableHead className="font-semibold">Mês</TableHead>
+                        <TableHead className="font-semibold">Data de renovação</TableHead>
                         <TableHead className="font-semibold">Validado por</TableHead>
                         <TableHead className="font-semibold">Data</TableHead>
                         <TableHead className="font-semibold w-[180px]">Ações</TableHead>
@@ -619,6 +645,15 @@ export default function ValidationsPage() {
                           </TableCell>
                           <TableCell>
                             <span className="text-sm">{formatMonth(validation.validation_month)}</span>
+                          </TableCell>
+                          <TableCell>
+                            {validation.expense?.renewal_date ? (
+                              <span className="text-sm">
+                                {new Date(validation.expense.renewal_date).toLocaleDateString('pt-BR')}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             {validation.validator ? (

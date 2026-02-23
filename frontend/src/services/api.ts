@@ -379,6 +379,15 @@ export const expensesApi = {
       if (filters?.expense_type?.length) {
         expenses = expenses.filter(e => filters.expense_type!.includes(e.expense_type));
       }
+      if (filters?.service_name) {
+        const term = filters.service_name.toLowerCase();
+        expenses = expenses.filter(e =>
+          e.service_name.toLowerCase().includes(term)
+        );
+      }
+      expenses.sort((a, b) =>
+        new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
+      );
       return expenses;
     }
     const params = new URLSearchParams();
@@ -388,6 +397,7 @@ export const expensesApi = {
     filters?.category_ids?.forEach((id) => params.append('category_ids', id));
     filters?.status?.forEach((s) => params.append('status', s));
     filters?.expense_type?.forEach((t) => params.append('expense_type', t));
+    if (filters?.service_name) params.append('service_name', filters.service_name);
     const { data } = await apiClient.get<Expense[]>(`/expenses?${params.toString()}`);
     return data;
   },
