@@ -506,7 +506,7 @@ export default function ValidationsPage() {
           {isLoading ? (
             <Card>
               <CardContent className="p-0">
-                <Table>
+                <Table className="text-xs">
                   <TableHeader>
                     <TableRow className="bg-muted/50">
                       <TableHead className="font-semibold">Código</TableHead>
@@ -519,7 +519,7 @@ export default function ValidationsPage() {
                       <TableHead className="font-semibold">Mês</TableHead>
                       <TableHead className="font-semibold">Validado por</TableHead>
                       <TableHead className="font-semibold">Data</TableHead>
-                      <TableHead className="font-semibold w-[180px]">Ações</TableHead>
+                      <TableHead className="font-semibold w-[150px]">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -574,7 +574,7 @@ export default function ValidationsPage() {
             <Card>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
-                  <Table>
+                  <Table className="text-xs">
                     <TableHeader>
                       <TableRow className="bg-muted/50">
                         <TableHead className="font-semibold">Código</TableHead>
@@ -588,7 +588,7 @@ export default function ValidationsPage() {
                         <TableHead className="font-semibold">Data de renovação</TableHead>
                         <TableHead className="font-semibold">Validado por</TableHead>
                         <TableHead className="font-semibold">Data</TableHead>
-                        <TableHead className="font-semibold w-[180px]">Ações</TableHead>
+                        <TableHead className="font-semibold w-[150px]">Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -602,13 +602,13 @@ export default function ValidationsPage() {
                           } ${validation.status === 'rejected' ? 'opacity-60' : ''}`}
                         >
                           <TableCell>
-                            <span className="font-mono text-sm tabular-nums">{validation.expense?.code ?? '—'}</span>
+                            <span className="font-mono tabular-nums">{validation.expense?.code ?? '—'}</span>
                           </TableCell>
                           <TableCell>
                             <div className="space-y-1">
                               <p className="font-medium">{validation.expense?.service_name || 'N/A'}</p>
                               {validation.expense?.category?.name && (
-                                <p className="text-sm text-muted-foreground">{validation.expense.category.name}</p>
+                                <p className="text-muted-foreground">{validation.expense.category.name}</p>
                               )}
                             </div>
                           </TableCell>
@@ -644,11 +644,11 @@ export default function ValidationsPage() {
                             {getStatusBadge(validation.status, validation.is_overdue, validation.is_predicted)}
                           </TableCell>
                           <TableCell>
-                            <span className="text-sm">{formatMonth(validation.validation_month)}</span>
+                            <span>{formatMonth(validation.validation_month)}</span>
                           </TableCell>
                           <TableCell>
                             {validation.expense?.renewal_date ? (
-                              <span className="text-sm">
+                              <span>
                                 {new Date(validation.expense.renewal_date).toLocaleDateString('pt-BR')}
                               </span>
                             ) : (
@@ -669,7 +669,7 @@ export default function ValidationsPage() {
                             {validation.validated_at ? (
                               <div className="flex items-center gap-1">
                                 <Calendar className="h-3 w-3 text-muted-foreground" />
-                                <span className="text-sm">
+                                <span>
                                   {new Date(validation.validated_at).toLocaleDateString('pt-BR')}
                                 </span>
                               </div>
@@ -706,7 +706,7 @@ export default function ValidationsPage() {
                                 </Button>
                               </div>
                             ) : (
-                              <span className="text-muted-foreground text-sm">—</span>
+                              <span className="text-muted-foreground">—</span>
                             )}
                           </TableCell>
                         </TableRow>
