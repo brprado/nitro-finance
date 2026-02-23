@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, XCircle, Loader2, Calendar, PartyPopper, Clock, User, Filter, Download } from 'lucide-react';
-import { validationsApi, companiesApi, usersApi } from '@/services/api';
+import { validationsApi, companiesApi, usersApi, departmentsApi } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -135,6 +135,7 @@ export default function ValidationsPage() {
   const [filters, setFilters] = useState<{
     company_id?: string;
     owner_id?: string;
+    department_id?: string;
     service_name?: string;
   }>({});
 
@@ -149,6 +150,11 @@ export default function ValidationsPage() {
   const { data: users } = useQuery({
     queryKey: ['users'],
     queryFn: usersApi.getAll,
+  });
+
+  const { data: departments } = useQuery({
+    queryKey: ['departments'],
+    queryFn: () => departmentsApi.getAll(),
   });
 
   // Detectar se é mês futuro
@@ -207,13 +213,16 @@ export default function ValidationsPage() {
       if (filters.owner_id && validation.expense?.owner?.id !== filters.owner_id) {
         return false;
       }
+      if (filters.department_id && validation.expense?.department?.id !== filters.department_id) {
+        return false;
+      }
       if (filters.service_name) {
         const term = filters.service_name.toLowerCase();
         if (!validation.expense?.service_name?.toLowerCase().includes(term)) return false;
       }
       return true;
     });
-  }, [validations, filters.company_id, filters.owner_id, filters.service_name]);
+  }, [validations, filters.company_id, filters.owner_id, filters.department_id, filters.service_name]);
 
   // Calcular totais
   const totals = useMemo(() => {
@@ -326,6 +335,11 @@ export default function ValidationsPage() {
   const handleOwnerChange = (value: string) => {
     const ownerId = value === 'all' ? undefined : value;
     setFilters({ ...filters, owner_id: ownerId });
+  };
+
+  const handleDepartmentChange = (value: string) => {
+    const departmentId = value === 'all' ? undefined : value;
+    setFilters({ ...filters, department_id: departmentId });
   };
 
   const clearFilters = () => {
@@ -483,7 +497,26 @@ export default function ValidationsPage() {
               </SelectContent>
               </Select>
             </div>
-            {(filters.company_id || filters.owner_id || filters.service_name) && (
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">Setor</Label>
+              <Select
+                value={filters.department_id ?? 'all'}
+                onValueChange={handleDepartmentChange}
+              >
+                <SelectTrigger className="h-9 w-[200px]">
+                  <SelectValue placeholder="Setor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os setores</SelectItem>
+                  {departments?.filter((d) => d.is_active)?.map((department) => (
+                    <SelectItem key={department.id} value={department.id}>
+                      {department.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {(filters.company_id || filters.owner_id || filters.department_id || filters.service_name) && (
               <Button variant="ghost" onClick={clearFilters} className="text-muted-foreground">
                 Limpar filtros
               </Button>
