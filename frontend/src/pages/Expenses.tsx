@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Filter, MoreHorizontal, Eye, Pencil, XCircle, Loader2 } from 'lucide-react';
 import { expensesApi, companiesApi, usersApi, categoriesApi } from '@/services/api';
@@ -48,6 +48,15 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, getStatusLabel, getStatusBadgeVariant, getPeriodicityLabel, formatDate, formatDateTime, formatMonth } from '@/lib/formatters';
 import { ExpenseForm } from '@/components/expenses/ExpenseForm';
@@ -63,6 +72,23 @@ const expenseTypeOptions: { value: ExpenseType; label: string }[] = [
   { value: 'one_time', label: 'Único' },
 ];
 
+const PAGE_SIZE = 10;
+
+function getPageNumbers(total: number, current: number): (number | 'ellipsis')[] {
+  if (total <= 1) return [];
+  const show = new Set<number>([1, total]);
+  for (let d = -2; d <= 2; d++) {
+    const p = current + d;
+    if (p >= 1 && p <= total) show.add(p);
+  }
+  const sorted = Array.from(show).sort((a, b) => a - b);
+  const result: (number | 'ellipsis')[] = [];
+  for (let i = 0; i < sorted.length; i++) {
+    if (i > 0 && sorted[i] - sorted[i - 1] > 1) result.push('ellipsis');
+    result.push(sorted[i]);
+  }
+  return result;
+}
 
 export default function ExpensesPage() {
   const { isAdmin, user } = useAuth();
@@ -70,6 +96,7 @@ export default function ExpensesPage() {
   const queryClient = useQueryClient();
   
   const [filters, setFilters] = useState<ExpenseFilters>({});
+  const [currentPage, setCurrentPage] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [viewingExpense, setViewingExpense] = useState<Expense | null>(null);
@@ -87,6 +114,17 @@ export default function ExpensesPage() {
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
   }, [expenses]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters]);
+
+  const totalPages = Math.ceil((sortedExpenses?.length ?? 0) / PAGE_SIZE);
+
+  const paginatedExpenses = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return sortedExpenses?.slice(start, start + PAGE_SIZE) ?? [];
+  }, [sortedExpenses, currentPage]);
 
   const { data: companies } = useQuery({
     queryKey: ['companies'],
@@ -305,7 +343,7 @@ export default function ExpensesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedExpenses?.map((expense) => (
+                {paginatedExpenses.map((expense) => (
                   <TableRow 
                     key={expense.id} 
                     className={`hover:bg-muted/50 transition-colors ${
@@ -434,6 +472,62 @@ export default function ExpensesPage() {
           )}
         </CardContent>
       </Card>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4">
+          <p className="text-sm text-muted-foreground">
+            Exibindo {Math.min((currentPage - 1) * PAGE_SIZE + 1, sortedExpenses?.length ?? 0)}–
+            {Math.min(currentPage * PAGE_SIZE, sortedExpenses?.length ?? 0)} de{' '}
+            {sortedExpenses?.length ?? 0} registros
+          </p>
+          <Pagination className="w-auto mx-0">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage((p) => Math.max(1, p - 1));
+                  }}
+                  aria-disabled={currentPage === 1}
+                  className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+                />
+              </PaginationItem>
+              {getPageNumbers(totalPages, currentPage).map((item, i) =>
+                item === 'ellipsis' ? (
+                  <PaginationItem key={`ellipsis-${i}`}>
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                ) : (
+                  <PaginationItem key={item}>
+                    <PaginationLink
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setCurrentPage(item);
+                      }}
+                      isActive={currentPage === item}
+                    >
+                      {item}
+                    </PaginationLink>
+                  </PaginationItem>
+                )
+              )}
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage((p) => Math.min(totalPages, p + 1));
+                  }}
+                  aria-disabled={currentPage === totalPages}
+                  className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
 
       {/* Create/Edit Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
