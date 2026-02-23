@@ -17,11 +17,13 @@ RENEWAL_CHECK_INTERVAL_SECONDS = 6 * 3600  # 6 horas
 
 
 async def _renewal_alert_loop():
-    """Loop em background que verifica alertas de renovação a cada 6 horas."""
+    """Loop em background: avança renewal_date passadas e verifica alertas de renovação a cada 6 horas."""
     from app.tasks.alert_tasks import check_and_create_renewal_alerts_7_3_1
+    from app.tasks.monthly_validation import advance_renewal_dates_task
 
     while True:
         try:
+            await asyncio.to_thread(advance_renewal_dates_task)
             logger.info("Iniciando verificação automática de alertas de renovação...")
             result = await asyncio.to_thread(check_and_create_renewal_alerts_7_3_1)
             logger.info("Verificação de renovação concluída: %s", result)

@@ -13,42 +13,43 @@ from app.schemas.expense_validation import ExpenseValidationCreate
 def should_create_validation_for_month(expense: Expense, target_month: date) -> bool:
     """
     Determina se deve criar validação para um mês específico baseado na periodicidade.
-    Validações começam no mês seguinte à criação da despesa.
+    Se a despesa tem renewal_date, usa o mês dessa data como âncora; senão usa created_at.
+    Não cria validação para meses anteriores ou iguais ao mês de criação da despesa.
     """
     if expense.expense_type != ExpenseType.RECURRING or not expense.periodicity:
         return False
-    
-    # Calcular meses desde a criação (usando primeiro dia do mês)
-    expense_creation_month = expense.created_at.replace(day=1).date() if isinstance(expense.created_at, datetime) else expense.created_at.replace(day=1)
+
     target_first_day = target_month.replace(day=1)
-    
-    # Se a despesa foi criada no mesmo mês ou depois, não criar validação
-    if target_first_day <= expense_creation_month:
+
+    # Não criar validação para meses anteriores ou iguais à criação
+    creation_month = (
+        expense.created_at.replace(day=1).date()
+        if isinstance(expense.created_at, datetime)
+        else expense.created_at.replace(day=1)
+    )
+    if target_first_day <= creation_month:
         return False
-    
-    # Calcular diferença em meses
-    months_since_creation = (target_first_day.year - expense_creation_month.year) * 12 + \
-                            (target_first_day.month - expense_creation_month.month)
-    
-    # Primeira validação sempre no mês seguinte à criação
-    if months_since_creation < 1:
-        return False
-    
+
+    # Usar renewal_date como âncora se disponível, senão usar created_at
+    if expense.renewal_date:
+        anchor_month = expense.renewal_date.replace(day=1)
+    else:
+        anchor_month = creation_month
+
     periodicity_months = {
         Periodicity.MONTHLY: 1,
         Periodicity.QUARTERLY: 3,
         Periodicity.SEMIANNUAL: 6,
-        Periodicity.ANNUAL: 12
+        Periodicity.ANNUAL: 12,
     }
-    
     months_interval = periodicity_months.get(expense.periodicity, 1)
-    
-    # Verificar se o mês alvo corresponde ao intervalo de periodicidade
-    # Para mensal: sempre criar
-    # Para trimestral: criar a cada 3 meses (1, 4, 7, 10...)
-    # Para semestral: criar a cada 6 meses (1, 7, 13...)
-    # Para anual: criar a cada 12 meses (1, 13, 25...)
-    return months_since_creation % months_interval == 0
+
+    # Calcular diferença em meses entre âncora e mês alvo
+    diff = (target_first_day.year - anchor_month.year) * 12 + (
+        target_first_day.month - anchor_month.month
+    )
+
+    return diff % months_interval == 0
 
 
 def create_validation_for_creation_month(db: Session, expense: Expense) -> ExpenseValidation | None:
@@ -129,6 +130,56 @@ def create_monthly_validations(db: Session, month_date: date) -> list[ExpenseVal
         db.refresh(validation)
     
     return validations
+
+
+def _last_day_of_month(year: int, month: int) -> int:
+    """Retorna o último dia do mês (ex: fev/2024 -> 29, fev/2023 -> 28)."""
+    if month == 12:
+        next_first = date(year + 1, 1, 1)
+    else:
+        next_first = date(year, month + 1, 1)
+    last_day = next_first - timedelta(days=1)
+    return last_day.day
+
+
+def advance_renewal_dates(db: Session) -> int:
+    """
+    Avança renewal_date para a próxima ocorrência futura baseada na periodicidade.
+    Despesas com renewal_date no passado têm a data atualizada (ex: 23/05/2025 -> 23/05/2026 para anual).
+    Preserva o dia original do mês (ex: dia 31 em jan -> 28 ou 29 em fev).
+    """
+    today = date.today()
+
+    expenses = db.query(Expense).filter(
+        Expense.status == ExpenseStatus.ACTIVE,
+        Expense.expense_type == ExpenseType.RECURRING,
+        Expense.renewal_date.isnot(None),
+        Expense.renewal_date < today,
+        Expense.periodicity.isnot(None),
+    ).all()
+
+    periodicity_months = {
+        Periodicity.MONTHLY: 1,
+        Periodicity.QUARTERLY: 3,
+        Periodicity.SEMIANNUAL: 6,
+        Periodicity.ANNUAL: 12,
+    }
+
+    count = 0
+    for expense in expenses:
+        interval = periodicity_months.get(expense.periodicity, 1)
+        new_date = expense.renewal_date
+        while new_date < today:
+            month = new_date.month + interval
+            year = new_date.year + (month - 1) // 12
+            month = (month - 1) % 12 + 1
+            day = min(new_date.day, _last_day_of_month(year, month))
+            new_date = date(year, month, day)
+        expense.renewal_date = new_date
+        count += 1
+
+    db.commit()
+    return count
 
 
 def _role_value(role) -> str:

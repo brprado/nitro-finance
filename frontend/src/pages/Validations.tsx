@@ -57,8 +57,8 @@ function getMonthOptions() {
     options.push({ value, label: formatMonth(value) });
   }
   
-  // Meses futuros (12 meses)
-  for (let i = 1; i <= 12; i++) {
+  // Meses futuros (24 meses = 2 anos)
+  for (let i = 1; i <= 24; i++) {
     const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
     const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     options.push({ value, label: formatMonth(value) + ' (previsto)' });
