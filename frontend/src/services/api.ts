@@ -116,7 +116,7 @@ export const usersApi = {
     return data;
   },
 
-  update: async (id: string, userData: Partial<User> & { company_ids?: string[] }): Promise<User> => {
+  update: async (id: string, userData: Partial<User> & { password?: string; company_ids?: string[] }): Promise<User> => {
     if (USE_MOCK) {
       await delay();
       const index = mockUsers.findIndex(u => u.id === id);
