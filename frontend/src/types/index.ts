@@ -300,6 +300,7 @@ export interface ExpenseFilters {
   category_ids?: string[];
   status?: ExpenseStatus[];
   expense_type?: ExpenseType[];
+  service_name?: string;
 }
 
 export interface AlertFilters {

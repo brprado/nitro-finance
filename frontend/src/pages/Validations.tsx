@@ -1,10 +1,12 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, XCircle, Loader2, Calendar, PartyPopper, Clock, User, Filter, Download } from 'lucide-react';
-import { validationsApi, companiesApi, usersApi } from '@/services/api';
+import { validationsApi, companiesApi, usersApi, departmentsApi } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -57,8 +59,8 @@ function getMonthOptions() {
     options.push({ value, label: formatMonth(value) });
   }
   
-  // Meses futuros (12 meses)
-  for (let i = 1; i <= 12; i++) {
+  // Meses futuros (24 meses = 2 anos)
+  for (let i = 1; i <= 24; i++) {
     const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
     const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     options.push({ value, label: formatMonth(value) + ' (previsto)' });
@@ -80,7 +82,7 @@ function buildValidationsCsv(
   formatCurrencyFn: (v: number, currency?: string) => string,
   formatMonthFn: (s: string) => string
 ): string {
-  const header = 'Código;Serviço;Empresa;Setor;Responsável;Valor;Status;Mês;Validado por;Data';
+  const header = 'Código;Serviço;Empresa;Setor;Responsável;Valor;Status;Mês;Data de renovação;Validado por;Data';
   const statusLabels: Record<string, string> = {
     pending: 'Pendente',
     approved: 'Aprovada',
@@ -99,9 +101,10 @@ function buildValidationsCsv(
         : '';
     const status = statusLabels[v.status] ?? v.status;
     const month = v.validation_month ? formatMonthFn(v.validation_month) : '';
+    const renewalDate = expense?.renewal_date ? formatDate(expense.renewal_date) : '';
     const validator = v.validator?.name ?? '';
     const date = v.validated_at ? formatDate(v.validated_at) : '';
-    return [code, service, company, department, owner, value, status, month, validator, date]
+    return [code, service, company, department, owner, value, status, month, renewalDate, validator, date]
       .map(escapeCsvCell)
       .join(';');
   });
@@ -132,6 +135,8 @@ export default function ValidationsPage() {
   const [filters, setFilters] = useState<{
     company_id?: string;
     owner_id?: string;
+    department_id?: string;
+    service_name?: string;
   }>({});
 
   const monthOptions = getMonthOptions();
@@ -145,6 +150,11 @@ export default function ValidationsPage() {
   const { data: users } = useQuery({
     queryKey: ['users'],
     queryFn: usersApi.getAll,
+  });
+
+  const { data: departments } = useQuery({
+    queryKey: ['departments'],
+    queryFn: () => departmentsApi.getAll(),
   });
 
   // Detectar se é mês futuro
@@ -194,7 +204,7 @@ export default function ValidationsPage() {
     ? pendingValidations || []
     : historyValidations || [];
 
-  // Aplicar filtros de empresa e responsável
+  // Aplicar filtros de empresa, responsável e nome
   const filteredValidations = useMemo(() => {
     return validations.filter((validation) => {
       if (filters.company_id && validation.expense?.company?.id !== filters.company_id) {
@@ -203,9 +213,16 @@ export default function ValidationsPage() {
       if (filters.owner_id && validation.expense?.owner?.id !== filters.owner_id) {
         return false;
       }
+      if (filters.department_id && validation.expense?.department?.id !== filters.department_id) {
+        return false;
+      }
+      if (filters.service_name) {
+        const term = filters.service_name.toLowerCase();
+        if (!validation.expense?.service_name?.toLowerCase().includes(term)) return false;
+      }
       return true;
     });
-  }, [validations, filters.company_id, filters.owner_id]);
+  }, [validations, filters.company_id, filters.owner_id, filters.department_id, filters.service_name]);
 
   // Calcular totais
   const totals = useMemo(() => {
@@ -320,6 +337,11 @@ export default function ValidationsPage() {
     setFilters({ ...filters, owner_id: ownerId });
   };
 
+  const handleDepartmentChange = (value: string) => {
+    const departmentId = value === 'all' ? undefined : value;
+    setFilters({ ...filters, department_id: departmentId });
+  };
+
   const clearFilters = () => {
     setFilters({});
   };
@@ -414,14 +436,27 @@ export default function ValidationsPage() {
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">Filtros:</span>
-            <Select
-              value={filters.company_id ?? 'all'}
-              onValueChange={handleCompanyChange}
-            >
-              <SelectTrigger className="w-[200px]">
+          <div className="flex flex-wrap items-end gap-3">
+            <Filter className="h-4 w-4 text-muted-foreground mb-2" />
+            <span className="text-sm font-medium text-muted-foreground mb-2">Filtros:</span>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">Nome</Label>
+              <Input
+                placeholder="Buscar por nome..."
+                value={filters.service_name ?? ''}
+                onChange={(e) =>
+                  setFilters({ ...filters, service_name: e.target.value || undefined })
+                }
+                className="h-9 w-[220px]"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">Empresa</Label>
+              <Select
+                value={filters.company_id ?? 'all'}
+                onValueChange={handleCompanyChange}
+              >
+                <SelectTrigger className="h-9 w-[200px]">
                 <SelectValue placeholder="Empresa" />
               </SelectTrigger>
               <SelectContent>
@@ -435,14 +470,17 @@ export default function ValidationsPage() {
                   </SelectItem>
                 ))}
               </SelectContent>
-            </Select>
-            <Select
-              value={filters.owner_id ?? 'all'}
-              onValueChange={handleOwnerChange}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Responsável" />
-              </SelectTrigger>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">Responsável</Label>
+              <Select
+                value={filters.owner_id ?? 'all'}
+                onValueChange={handleOwnerChange}
+              >
+                <SelectTrigger className="h-9 w-[200px]">
+                  <SelectValue placeholder="Responsável" />
+                </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os responsáveis</SelectItem>
                 {(user?.role === 'leader' && user
@@ -457,8 +495,28 @@ export default function ValidationsPage() {
                   </SelectItem>
                 ))}
               </SelectContent>
-            </Select>
-            {(filters.company_id || filters.owner_id) && (
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">Setor</Label>
+              <Select
+                value={filters.department_id ?? 'all'}
+                onValueChange={handleDepartmentChange}
+              >
+                <SelectTrigger className="h-9 w-[200px]">
+                  <SelectValue placeholder="Setor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os setores</SelectItem>
+                  {departments?.filter((d) => d.is_active)?.map((department) => (
+                    <SelectItem key={department.id} value={department.id}>
+                      {department.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {(filters.company_id || filters.owner_id || filters.department_id || filters.service_name) && (
               <Button variant="ghost" onClick={clearFilters} className="text-muted-foreground">
                 Limpar filtros
               </Button>
@@ -481,7 +539,7 @@ export default function ValidationsPage() {
           {isLoading ? (
             <Card>
               <CardContent className="p-0">
-                <Table>
+                <Table className="text-xs">
                   <TableHeader>
                     <TableRow className="bg-muted/50">
                       <TableHead className="font-semibold">Código</TableHead>
@@ -494,7 +552,7 @@ export default function ValidationsPage() {
                       <TableHead className="font-semibold">Mês</TableHead>
                       <TableHead className="font-semibold">Validado por</TableHead>
                       <TableHead className="font-semibold">Data</TableHead>
-                      <TableHead className="font-semibold w-[180px]">Ações</TableHead>
+                      <TableHead className="font-semibold w-[150px]">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -549,7 +607,7 @@ export default function ValidationsPage() {
             <Card>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
-                  <Table>
+                  <Table className="text-xs">
                     <TableHeader>
                       <TableRow className="bg-muted/50">
                         <TableHead className="font-semibold">Código</TableHead>
@@ -560,9 +618,10 @@ export default function ValidationsPage() {
                         <TableHead className="font-semibold text-right">Valor</TableHead>
                         <TableHead className="font-semibold">Status</TableHead>
                         <TableHead className="font-semibold">Mês</TableHead>
+                        <TableHead className="font-semibold">Data de renovação</TableHead>
                         <TableHead className="font-semibold">Validado por</TableHead>
                         <TableHead className="font-semibold">Data</TableHead>
-                        <TableHead className="font-semibold w-[180px]">Ações</TableHead>
+                        <TableHead className="font-semibold w-[150px]">Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -576,13 +635,13 @@ export default function ValidationsPage() {
                           } ${validation.status === 'rejected' ? 'opacity-60' : ''}`}
                         >
                           <TableCell>
-                            <span className="font-mono text-sm tabular-nums">{validation.expense?.code ?? '—'}</span>
+                            <span className="font-mono tabular-nums">{validation.expense?.code ?? '—'}</span>
                           </TableCell>
                           <TableCell>
                             <div className="space-y-1">
                               <p className="font-medium">{validation.expense?.service_name || 'N/A'}</p>
                               {validation.expense?.category?.name && (
-                                <p className="text-sm text-muted-foreground">{validation.expense.category.name}</p>
+                                <p className="text-muted-foreground">{validation.expense.category.name}</p>
                               )}
                             </div>
                           </TableCell>
@@ -618,7 +677,16 @@ export default function ValidationsPage() {
                             {getStatusBadge(validation.status, validation.is_overdue, validation.is_predicted)}
                           </TableCell>
                           <TableCell>
-                            <span className="text-sm">{formatMonth(validation.validation_month)}</span>
+                            <span>{formatMonth(validation.validation_month)}</span>
+                          </TableCell>
+                          <TableCell>
+                            {validation.expense?.renewal_date ? (
+                              <span>
+                                {new Date(validation.expense.renewal_date).toLocaleDateString('pt-BR')}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             {validation.validator ? (
@@ -634,7 +702,7 @@ export default function ValidationsPage() {
                             {validation.validated_at ? (
                               <div className="flex items-center gap-1">
                                 <Calendar className="h-3 w-3 text-muted-foreground" />
-                                <span className="text-sm">
+                                <span>
                                   {new Date(validation.validated_at).toLocaleDateString('pt-BR')}
                                 </span>
                               </div>
@@ -671,7 +739,7 @@ export default function ValidationsPage() {
                                 </Button>
                               </div>
                             ) : (
-                              <span className="text-muted-foreground text-sm">—</span>
+                              <span className="text-muted-foreground">—</span>
                             )}
                           </TableCell>
                         </TableRow>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Loader2, Users } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Users, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { usersApi, companiesApi } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +28,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -58,6 +59,9 @@ export default function UsersPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
+  const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState('');
+  const [showResetPassword, setShowResetPassword] = useState(false);
   
   // Form state
   const [formName, setFormName] = useState('');
@@ -118,6 +122,18 @@ export default function UsersPage() {
       queryClient.invalidateQueries({ queryKey: ['validations'], exact: false });
       setDeletingUser(null);
       toast({ title: 'Usuário removido com sucesso!' });
+    },
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: ({ id, password }: { id: string; password: string }) =>
+      usersApi.update(id, { password }),
+    onSuccess: () => {
+      setResetPasswordUser(null);
+      toast({ title: 'Senha redefinida com sucesso.' });
+    },
+    onError: () => {
+      toast({ variant: 'destructive', title: 'Erro ao redefinir senha.' });
     },
   });
 
@@ -296,6 +312,18 @@ export default function UsersPage() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          title="Redefinir senha"
+                          onClick={() => {
+                            setResetPasswordUser(user);
+                            setResetPasswordValue('');
+                            setShowResetPassword(false);
+                          }}
+                        >
+                          <KeyRound className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={() => handleEdit(user)}
                         >
                           <Pencil className="h-4 w-4" />
@@ -445,6 +473,55 @@ export default function UsersPage() {
             >
               {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {editingUser ? 'Salvar' : 'Criar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Redefinir senha */}
+      <Dialog open={!!resetPasswordUser} onOpenChange={(open) => !open && setResetPasswordUser(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Redefinir senha</DialogTitle>
+            <DialogDescription>
+              Defina uma nova senha para <strong>{resetPasswordUser?.name}</strong>.
+              A senha anterior não pode ser recuperada.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="reset-password">Nova senha *</Label>
+            <div className="relative">
+              <Input
+                id="reset-password"
+                type={showResetPassword ? 'text' : 'password'}
+                value={resetPasswordValue}
+                onChange={(e) => setResetPasswordValue(e.target.value)}
+                placeholder="••••••••"
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowResetPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                tabIndex={-1}
+              >
+                {showResetPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetPasswordUser(null)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={!resetPasswordValue.trim() || resetPasswordMutation.isPending}
+              onClick={() =>
+                resetPasswordUser &&
+                resetPasswordMutation.mutate({ id: resetPasswordUser.id, password: resetPasswordValue })
+              }
+            >
+              {resetPasswordMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Redefinir
             </Button>
           </DialogFooter>
         </DialogContent>

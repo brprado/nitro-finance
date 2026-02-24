@@ -23,7 +23,7 @@ def _next_expense_code(db: Session) -> str:
 
 
 def get_all(db: Session) -> list[Expense]:
-    """Lista todas as despesas com relacionamentos"""
+    """Lista todas as despesas com relacionamentos (mais recente primeiro)."""
     return db.query(Expense)\
         .options(
             joinedload(Expense.category),
@@ -32,6 +32,7 @@ def get_all(db: Session) -> list[Expense]:
             joinedload(Expense.owner),
             joinedload(Expense.approver)
         )\
+        .order_by(Expense.created_at.desc())\
         .all()
 
 
@@ -44,6 +45,7 @@ def get_filtered(
     category_ids: list[UUID] | None = None,
     statuses: list[ExpenseStatus] | None = None,
     expense_types: list[ExpenseType] | None = None,
+    service_name: str | None = None,
 ) -> list[Expense]:
     """Lista despesas com filtros opcionais (listas). Lista vazia = nenhum resultado, None = não filtra."""
     query = db.query(Expense).options(
@@ -80,6 +82,8 @@ def get_filtered(
         query = query.filter(Expense.status.in_(statuses))
     if expense_types:
         query = query.filter(Expense.expense_type.in_(expense_types))
+    if service_name and service_name.strip():
+        query = query.filter(Expense.service_name.ilike(f"%{service_name.strip()}%"))
     query = query.order_by(Expense.created_at.desc())
     return query.all()
 
@@ -190,7 +194,7 @@ def create(
         user_count=data.user_count,
         evidence_link=data.evidence_link,
         login=data.login,
-        password=data.password,
+        password=(data.password.strip() if data.password and data.password.strip() else "N/A"),
         notes=data.notes,
         status=ExpenseStatus.ACTIVE,
         created_by_id=created_by_id,

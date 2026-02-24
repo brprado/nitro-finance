@@ -39,3 +39,18 @@ def create_monthly_validations_task(month_date: date | None = None) -> dict:
         }
     finally:
         db.close()
+
+
+def advance_renewal_dates_task() -> dict:
+    """
+    Avança renewal_date de despesas recorrentes ativas cuja data já passou
+    para a próxima ocorrência (ex: anual 23/05/2025 -> 23/05/2026).
+    """
+    db: Session = SessionLocal()
+    try:
+        count = expense_validation_service.advance_renewal_dates(db)
+        return {"success": True, "advanced": count}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+    finally:
+        db.close()

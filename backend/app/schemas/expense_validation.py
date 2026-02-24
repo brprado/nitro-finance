@@ -83,6 +83,7 @@ class ExpenseBasic(BaseModel):
     company: Optional[CompanyBasic] = None
     department: Optional[DepartmentBasic] = None
     owner: Optional[UserBasic] = None
+    renewal_date: Optional[date] = None
 
     class Config:
         from_attributes = True

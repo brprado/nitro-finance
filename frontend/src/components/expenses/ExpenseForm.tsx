@@ -3,7 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Loader2, CalendarIcon } from 'lucide-react';
+import { Loader2, CalendarIcon, Eye, EyeOff } from 'lucide-react';
 import { AxiosError } from 'axios';
 import { expensesApi, companiesApi, departmentsApi, categoriesApi, usersApi } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
@@ -142,6 +142,7 @@ export function ExpenseForm({ expense, onSuccess, onCancel }: ExpenseFormProps) 
   const { user } = useAuth();
   const { toast } = useToast();
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const { data: companies } = useQuery({
     queryKey: ['companies'],
@@ -200,7 +201,7 @@ export function ExpenseForm({ expense, onSuccess, onCancel }: ExpenseFormProps) 
           value: '',
           periodicity: undefined,
           login: '',
-          password: '',
+          password: 'N/A',
           renewal_date: '',
           payment_method: undefined,
           payment_identifier: '',
@@ -386,7 +387,7 @@ export function ExpenseForm({ expense, onSuccess, onCancel }: ExpenseFormProps) 
         user_count: data.user_count,
         evidence_link: data.evidence_link?.trim() || undefined,
         login: data.login?.trim() || undefined,
-        password: data.password?.trim() || undefined,
+        password: data.password?.trim() || 'N/A',
         notes: data.notes?.trim() || undefined,
       };
       createMutation.mutate(formData);
@@ -792,12 +793,27 @@ export function ExpenseForm({ expense, onSuccess, onCancel }: ExpenseFormProps) 
 
           <div>
             <Label htmlFor="password">Senha</Label>
-            <Input
-              id="password"
-              type="password"
-              {...register('password')}
-              placeholder="Ex: senha123 ou N/A"
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                {...register('password')}
+                placeholder="Ex: senha123 ou N/A"
+                className="pr-10"
+              />
+              <button
+                type="button"
+                aria-label="Alternar visibilidade da senha"
+                onClick={() => setShowPassword((p) => !p)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 rounded p-0.5"
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
             {errors.password && (
               <p className="text-sm text-destructive mt-1">{errors.password.message}</p>
             )}
