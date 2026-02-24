@@ -1,9 +1,10 @@
-# 💳 Nitro Finance
+# Nitro Finance
 
 **Versão:** 1.0.0  
 **Status:** MVP em desenvolvimento  
 
-## 📌 Visão Geral
+## Visão Geral
+
 O **Nitro Finance** é um **sistema corporativo de gestão de despesas e assinaturas**, criado para centralizar, padronizar e auditar custos recorrentes e pontuais dentro de empresas.
 
 O sistema resolve problemas comuns como:
@@ -12,11 +13,12 @@ O sistema resolve problemas comuns como:
 - Ausência de auditoria e rastreabilidade de decisões  
 - Dificuldade de controle por empresa, setor e responsável  
 
-O Nitro Finance força **governança financeira**, garantindo que toda despesa tenha responsável, validação periódica e histórico auditável.
+O Nitro Finance reforça **governança financeira**, garantindo que toda despesa tenha responsável, validação periódica e histórico auditável.
 
 ---
 
-## 🎯 Objetivos do Projeto
+## Objetivos do Projeto
+
 - Centralizar despesas corporativas em um único sistema  
 - Gerenciar assinaturas recorrentes (SaaS, serviços, ferramentas)  
 - Reduzir desperdícios financeiros  
@@ -26,106 +28,98 @@ O Nitro Finance força **governança financeira**, garantindo que toda despesa t
 
 ---
 
-## 🧩 Funcionalidades do MVP (V1)
+## Funcionalidades do MVP (V1)
 
-### 🔹 Gestão de Despesas
-- Cadastro de despesas recorrentes e não recorrentes  
+### Gestão de Despesas
+- Cadastro de despesas recorrentes e únicas  
 - Classificação por empresa, setor, categoria e moeda  
 - Controle de status (ativo, em cancelamento, cancelado)  
+- Paginação (10 registros por página) e filtros por empresa, setor, responsável, status e tipo  
+- Edição por **Líder** nas despesas sob sua responsabilidade (empresas vinculadas)  
 
-### 🔹 Validação Mensal
-- Fluxo obrigatório de validação mensal por líderes  
-- Registro automático de não validações  
-- Histórico de confirmações e pendências  
+### Validação Mensal
+- Fluxo obrigatório de validação mensal  
+- Aba Validações com filtros por nome, empresa, responsável e setor  
+- Data de renovação exibida e avançada automaticamente ao aprovar  
+- Histórico de confirmações e pendências; exportação em CSV  
 
-### 🔹 Auditoria Automática
-- Registro de todas as ações do sistema  
-- Histórico completo de alterações  
-- Rastreabilidade por usuário e data  
+### Auditoria e Acesso
+- Registro de ações e histórico de alterações  
+- Permissões por perfil; isolamento de dados por empresa e setor  
+- **Finance Admin** e **System Admin**: redefinição de senha de qualquer usuário  
 
-### 🔹 Alertas Inteligentes
-- Alertas de renovação próxima  
-- Alertas de pendências de validação  
-- Notificações in-app (sem envio externo)  
-
-### 🔹 Dashboards
-- Visão consolidada de gastos  
-- Totais por empresa, setor e categoria  
-- Ranking das maiores despesas  
-- Filtros avançados  
-
-### 🔹 Controle de Acesso
-- Permissões baseadas em perfil  
-- Isolamento de dados por empresa e setor  
+### Alertas e Dashboards
+- Alertas de renovação e pendências de validação (notificações in-app)  
+- Dashboard com visão consolidada, totais por empresa/setor/categoria e filtros  
 
 ---
 
-## 🔐 Perfis de Usuário
+## Perfis de Usuário
 
-| Perfil | Permissões |
-|------|-----------|
-| **FinanceAdmin** | Acesso total, ativação e cancelamento de despesas |
-| **SystemAdmin** | Acesso técnico e auditoria (dados sensíveis mascarados) |
-| **Leader** | Validação mensal das despesas do seu setor |
-| **User** | Criação de solicitações e acompanhamento |
-
----
-
-## 📁 Estrutura do repositório
-
-- **`backend/`** — API FastAPI (Python)
-- **`frontend/`** — Interface React (Vite + TypeScript)
+| Perfil           | Permissões |
+|------------------|------------|
+| **Finance Admin** | Acesso total; criar/editar/cancelar despesas; gerenciar usuários; redefinir senha de qualquer usuário. |
+| **System Admin**  | Igual ao Finance Admin (acesso técnico e auditoria). |
+| **Leader**        | Validação mensal das despesas das empresas vinculadas; **editar** despesas sob sua responsabilidade; visualizar dados do seu escopo. |
+| **User**          | Criação de despesas e acompanhamento das próprias. |
 
 ---
 
-## 🚀 Início Rápido - Desenvolvimento Local
+## Estrutura do Repositório
 
-Para configurar o ambiente de desenvolvimento local, consulte o guia completo:
+- **`backend/`** — API REST em FastAPI (Python)  
+- **`frontend/`** — Interface em React (Vite + TypeScript)  
 
-**[📖 SETUP_LOCALHOST.md](SETUP_LOCALHOST.md)**
+---
 
-### Resumo rápido:
+## Início Rápido (Desenvolvimento Local)
 
-1. **Backend:**
+Guia completo: **[SETUP_LOCALHOST.md](SETUP_LOCALHOST.md)**  
+
+### Resumo
+
+1. **Backend**
    ```bash
    cd backend
    python -m venv venv
-   source venv/bin/activate  # ou venv\Scripts\activate no Windows
+   source venv/bin/activate   # Windows: venv\Scripts\activate
    pip install -r requirements.txt
-   cp .env.example .env  # Configure suas credenciais do banco
+   cp .env.example .env      # Configurar credenciais do banco
    alembic upgrade head
    uvicorn app.main:app --reload --port 8000
    ```
 
-2. **Frontend:**
+2. **Frontend**
    ```bash
    cd frontend
    npm install
    npm run dev
    ```
 
-3. **Acesse:**
-   - Frontend: http://localhost:5173
-   - Backend API: http://localhost:8000
-   - API Docs: http://localhost:8000/docs
+3. **Acessos**
+   - Frontend: http://localhost:5173  
+   - API: http://localhost:8000  
+   - Documentação da API: http://localhost:8000/docs  
 
 ---
 
-## 🛠️ Tecnologias Utilizadas
+## Tecnologias
 
 ### Backend
-- Python  
+- Python 3  
 - FastAPI  
-- JWT (JSON Web Tokens)  
+- SQLAlchemy 2 + Alembic  
+- PostgreSQL  
+- JWT (python-jose) e bcrypt  
 
 ### Frontend
-- React (pasta `frontend/`)  
+- React 18  
+- Vite  
+- TypeScript  
+- TanStack Query (React Query)  
+- React Router  
+- Tailwind CSS  
+- Radix UI  
 
 ### Banco de Dados
 - PostgreSQL  
-
-### Infraestrutura
-- Nuvem (infraestrutura existente)  
-- Docker  
-
----
